@@ -31,3 +31,14 @@ export function normalizeAnswer(s: string): string {
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
 }
+
+/** Tolérance Levenshtein ≤ 2 sur la réponse principale et les alias éventuels. */
+export function matchOpenTolerance(
+  raw: string,
+  expected: string,
+  aliases?: string[],
+): boolean {
+  const g = normalizeAnswer(raw);
+  const candidates = [expected, ...(aliases ?? [])].map((s) => normalizeAnswer(s));
+  return candidates.some((c) => levenshtein(g, c) <= 2);
+}

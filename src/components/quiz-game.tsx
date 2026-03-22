@@ -16,7 +16,8 @@ import {
   MINIBAC_POINTS_PER_CELL,
   type MinibacSubmission,
 } from "@/lib/lobby-remote";
-import { levenshtein, normalizeAnswer } from "@/lib/levenshtein";
+import { matchOpenTolerance } from "@/lib/levenshtein";
+import { buildGeoFlagUrl, buildGeoShapeUrl } from "@/lib/quiz-bank";
 
 type QuizGameProps = {
   roomCode: string;
@@ -31,6 +32,8 @@ const GET_DURATION = (type: string) => {
   if (type === "qcm") return 12;
   if (type === "date") return 12;
   if (type === "minibac") return 90;
+  if (type === "geo_flag") return 18;
+  if (type === "geo_shape") return 22;
   return 15;
 };
 
@@ -156,11 +159,17 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       return earned;
     }
 
-    if (currentQuestion.type === "open") {
-      const expected = normalizeAnswer(String(currentQuestion.answer));
+    if (
+      currentQuestion.type === "open" ||
+      currentQuestion.type === "geo_flag" ||
+      currentQuestion.type === "geo_shape"
+    ) {
       Object.entries(answers).forEach(([pId, ans]) => {
-        const got = normalizeAnswer(String(ans));
-        if (levenshtein(got, expected) <= 2) earned[pId] = pts;
+        if (
+          matchOpenTolerance(String(ans), String(currentQuestion.answer), currentQuestion.answerAliases)
+        ) {
+          earned[pId] = pts;
+        }
       });
       return earned;
     }
@@ -373,7 +382,45 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               </div>
 
               {myPlayerId === current.playerId ? (
-                <p className="text-slate-500 font-bold animate-pulse">Les autres votent…</p>
+                <div className="w-full text-left">
+                  <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:text-xs">
+                    Votes en direct
+                  </p>
+                  {voters.length === 0 ? (
+                    <p className="text-center text-xs text-slate-400">Aucun autre joueur pour voter.</p>
+                  ) : (
+                    <ul className="flex max-h-[min(40vh,280px)] flex-col gap-1.5 overflow-y-auto pr-0.5">
+                      {voters.map((v) => {
+                        const vChoice = votesForGrid[v.id];
+                        return (
+                          <motion.li
+                            key={v.id}
+                            layout
+                            initial={false}
+                            animate={{ opacity: 1 }}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/90 px-3 py-2 text-sm"
+                          >
+                            <span className="min-w-0 truncate font-semibold text-slate-800">{v.name}</span>
+                            <span className="shrink-0 text-xs font-bold sm:text-sm">
+                              {vChoice === "accept" && (
+                                <span className="text-green-600">✓ Accepté</span>
+                              )}
+                              {vChoice === "reject" && (
+                                <span className="text-red-600">✗ Refusé</span>
+                              )}
+                              {!vChoice && (
+                                <span className="text-slate-400 animate-pulse">En attente…</span>
+                              )}
+                            </span>
+                          </motion.li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <p className="mt-3 text-center text-[10px] tabular-nums text-slate-400">
+                    {Object.keys(votesForGrid).length} / {voters.length} votes reçus
+                  </p>
+                </div>
               ) : (
                 <div className="flex justify-center gap-2 sm:gap-3">
                   <motion.button
@@ -507,10 +554,21 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     currentQuestion.type === "estimation" ||
     currentQuestion.type === "open" ||
     currentQuestion.type === "date" ||
-    currentQuestion.type === "minibac";
+    currentQuestion.type === "minibac" ||
+    currentQuestion.type === "geo_flag" ||
+    currentQuestion.type === "geo_shape";
   const isEstimation = currentQuestion.type === "estimation";
   const isDate = currentQuestion.type === "date";
   const isMinibac = currentQuestion.type === "minibac";
+  const isGeoFlag = currentQuestion.type === "geo_flag";
+  const isGeoShape = currentQuestion.type === "geo_shape";
+  const isGeo = isGeoFlag || isGeoShape;
+  const geoImageUrl =
+    isGeo && currentQuestion.countryCode
+      ? isGeoFlag
+        ? buildGeoFlagUrl(currentQuestion.countryCode)
+        : buildGeoShapeUrl(currentQuestion.countryCode)
+      : null;
   const myPoints = pointsEarnedThisRound[myPlayerId] || 0;
   const myMinibac = parseMinibacAnswer(myAnswer);
 
@@ -559,6 +617,20 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               : "🤔"}
         </span>
         <h2 className="text-lg font-bold leading-snug text-slate-800 sm:text-2xl">{currentQuestion.question}</h2>
+        {geoImageUrl && (
+          <div className="mt-4 flex justify-center">
+            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={geoImageUrl}
+                alt=""
+                className={`mx-auto max-h-[min(42vw,200px)] w-auto object-contain sm:max-h-[220px] ${isGeoShape ? "p-2" : ""}`}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        )}
       </motion.div>
 
       <div className="flex w-full min-h-0 flex-1 flex-col gap-2 pb-1 sm:gap-3 sm:pb-0">
@@ -621,7 +693,9 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       ? "Année (ex. 1998)…"
                       : isEstimation
                         ? "Entre un nombre…"
-                        : "Ta réponse…"
+                        : isGeo
+                          ? "Nom du pays…"
+                          : "Ta réponse…"
                   }
                   className="w-full text-center text-3xl font-bold py-6 rounded-2xl border-none shadow-inner bg-white/90 focus:ring-4 focus:ring-violet-400 outline-none disabled:opacity-50"
                 />
@@ -668,8 +742,22 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                 ) : (
                   <>
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">
-                      {isDate ? "La bonne année" : "La bonne réponse"}
+                      {isDate ? "La bonne année" : isGeo ? "Le bon pays" : "La bonne réponse"}
                     </p>
+                    {geoImageUrl && (
+                      <div className="mb-3 flex justify-center">
+                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={geoImageUrl}
+                            alt=""
+                            className={`mx-auto max-h-24 object-contain sm:max-h-28 ${isGeoShape ? "p-1.5" : ""}`}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <p className="text-4xl font-black text-green-500">{String(currentQuestion.answer)}</p>
                     <div className="h-px w-full bg-slate-200 my-4"></div>
                     <p className="text-sm font-bold text-slate-500">
