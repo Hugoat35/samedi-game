@@ -1,4 +1,7 @@
-/** Mots français sans accents — alignés avec `wordle_dictionary` (migrations 008 + 009). */
+/**
+ * Listes utilisées pour **générer** les `INSERT` (script `dump-wordle-sql.ts`).
+ * La validation en jeu repose sur la table `wordle_dictionary` + RPC `wordle_word_exists`.
+ */
 const RAW = [
   "AIDER",
   "AIGLE",
@@ -515,15 +518,4 @@ export function wordLengthForPlayerCount(n: number): 5 | 6 | 7 {
   if (n <= 3) return 5;
   if (n <= 5) return 6;
   return 7;
-}
-
-export function isValidWordFr(w: string, len: number): boolean {
-  const u = w.trim().toUpperCase();
-  if (u.length !== len || !/^[A-Z]+$/.test(u)) return false;
-  const list = len === 5 ? WORDS_FR_5 : len === 6 ? WORDS_FR_6 : len === 7 ? WORDS_FR_7 : [];
-  return list.includes(u);
-}
-
-export function isValidWordFr5(w: string): boolean {
-  return isValidWordFr(w, 5);
 }

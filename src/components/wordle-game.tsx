@@ -1,10 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Player } from "@/lib/lobby-types";
-import { returnToLobbyRemote, submitWordleGuessRemote } from "@/lib/lobby-remote";
-import { isValidWordFr } from "@/lib/wordle-dict";
+import { returnToLobbyRemote, submitWordleGuessRemote, wordleWordExistsRemote } from "@/lib/lobby-remote";
 
 type WordleGameProps = {
   roomCode: string;
@@ -45,6 +44,47 @@ function cellClass(mark: string): string {
   if (mark === "G") return "bg-emerald-500 text-white border-emerald-600";
   if (mark === "Y") return "bg-amber-400 text-white border-amber-500";
   return "bg-slate-400 text-white border-slate-500";
+}
+
+function feedbackRank(f: string): number {
+  if (f === "G") return 3;
+  if (f === "Y") return 2;
+  return 1;
+}
+
+/** Meilleur indice connu par lettre (vert > jaune > gris) sur la manche en cours. */
+function bestKeyHints(
+  rows: Array<{ word: string; feedback: string[] }>,
+): Record<string, "G" | "Y" | "X"> {
+  const rank: Record<string, number> = {};
+  const best: Record<string, "G" | "Y" | "X"> = {};
+  for (const g of rows) {
+    const letters = g.word.toUpperCase().split("");
+    const fb = g.feedback || [];
+    for (let i = 0; i < letters.length; i++) {
+      const L = letters[i];
+      const f = (fb[i] ?? "X") as "G" | "Y" | "X";
+      const rr = feedbackRank(f);
+      if (rr > (rank[L] ?? 0)) {
+        rank[L] = rr;
+        best[L] = f;
+      }
+    }
+  }
+  return best;
+}
+
+function keyButtonClass(mark: string | undefined, disabled: boolean): string {
+  const base =
+    "h-9 min-w-[2rem] rounded-lg border text-sm font-bold shadow-sm transition sm:h-10 sm:min-w-[2.25rem] sm:text-base ";
+  if (!mark) {
+    return (
+      base +
+      "border-slate-200 bg-slate-100 text-slate-800 hover:bg-slate-200 " +
+      (disabled ? "opacity-40" : "")
+    );
+  }
+  return base + cellClass(mark) + " hover:brightness-95 " + (disabled ? "opacity-40" : "");
 }
 
 function mapRpcError(raw: string | undefined, wordLen: number): string {
@@ -88,12 +128,38 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [dictOk, setDictOk] = useState<boolean | null>(null);
+  const dictCheckId = useRef(0);
+
+  const keyHints = useMemo(() => bestKeyHints(guesses), [guesses]);
+
+  const draftWord = draft.trim().toUpperCase();
+  const draftLooksFull = draftWord.length === wordLen && /^[A-Z]+$/.test(draftWord);
+
+  useEffect(() => {
+    const w = draft.trim().toUpperCase();
+    const full = w.length === wordLen && /^[A-Z]+$/.test(w);
+    if (!full) {
+      setDictOk(null);
+      return;
+    }
+    const id = ++dictCheckId.current;
+    setDictOk(null);
+    const t = setTimeout(() => {
+      void (async () => {
+        const ok = await wordleWordExistsRemote(w);
+        if (dictCheckId.current !== id) return;
+        setDictOk(ok);
+      })();
+    }, 200);
+    return () => clearTimeout(t);
+  }, [draft, wordLen]);
 
   const myTurn = currentTurnId === myPlayerId && status === "playing";
   const canSubmit =
     myTurn &&
-    draft.trim().length === wordLen &&
-    isValidWordFr(draft, wordLen) &&
+    draftLooksFull &&
+    dictOk === true &&
     !busy &&
     gameState === "playing";
 
@@ -284,44 +350,47 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
             onClick={() => void submit()}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 disabled:opacity-40 sm:px-5 sm:py-2.5 sm:text-base"
           >
-            {busy ? "…" : "Valider"}
+            {busy ? "…" : draftLooksFull && dictOk === null ? "…" : "Valider"}
           </motion.button>
         </div>
+        {draftLooksFull && dictOk === false && (
+          <p className="text-center text-[11px] font-semibold text-amber-700">Mot absent du dictionnaire.</p>
+        )}
         {err && <p className="text-center text-xs font-semibold text-red-600">{err}</p>}
 
         <div className="mt-2 flex flex-col gap-1.5">
-          <div className="flex justify-center gap-1">
+          <div className="flex flex-wrap justify-center gap-1">
             {ROW1.map((k) => (
               <button
                 key={k}
                 type="button"
                 disabled={!myTurn || busy}
                 onClick={() => append(k)}
-                className="h-9 min-w-[2rem] rounded-lg bg-slate-100 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-200 disabled:opacity-40 sm:h-10 sm:min-w-[2.25rem] sm:text-base"
+                className={keyButtonClass(keyHints[k], !myTurn || busy)}
               >
                 {k}
               </button>
             ))}
           </div>
-          <div className="flex justify-center gap-1">
+          <div className="flex flex-wrap justify-center gap-1">
             {ROW2.map((k) => (
               <button
                 key={k}
                 type="button"
                 disabled={!myTurn || busy}
                 onClick={() => append(k)}
-                className="h-9 min-w-[2rem] rounded-lg bg-slate-100 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-200 disabled:opacity-40 sm:h-10 sm:min-w-[2.25rem] sm:text-base"
+                className={keyButtonClass(keyHints[k], !myTurn || busy)}
               >
                 {k}
               </button>
             ))}
           </div>
-          <div className="flex justify-center gap-1">
+          <div className="flex flex-wrap justify-center gap-1">
             <button
               type="button"
               disabled={!myTurn || busy}
               onClick={backspace}
-              className="h-9 rounded-lg bg-slate-200 px-3 text-xs font-bold text-slate-700 sm:h-10 sm:text-sm"
+              className="h-9 rounded-lg border border-slate-200 bg-slate-200 px-3 text-xs font-bold text-slate-700 shadow-sm sm:h-10 sm:text-sm"
             >
               ⌫
             </button>
@@ -331,7 +400,7 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
                 type="button"
                 disabled={!myTurn || busy}
                 onClick={() => append(k)}
-                className="h-9 min-w-[2rem] rounded-lg bg-slate-100 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-200 disabled:opacity-40 sm:h-10 sm:min-w-[2.25rem] sm:text-base"
+                className={keyButtonClass(keyHints[k], !myTurn || busy)}
               >
                 {k}
               </button>

@@ -430,6 +430,17 @@ export async function startWordleGameRemote(
   return { ok: true };
 }
 
+/** Indique si le mot figure dans `wordle_dictionary` (source de vérité = base). */
+export async function wordleWordExistsRemote(word: string): Promise<boolean> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc("wordle_word_exists", {
+    p_word: word.trim().toUpperCase(),
+  });
+  if (error) return false;
+  return Boolean(data);
+}
+
 export async function submitWordleGuessRemote(
   roomCode: string,
   playerId: string,
