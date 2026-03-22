@@ -150,6 +150,96 @@ export async function measureSupabasePingMs(): Promise<number | null> {
 
 // --- FONCTIONS DE JEU MISES À JOUR AVEC LE SYSTÈME DE SCORES ---
 
+export type MinibacSubmission = {
+  letter: string;
+  categories: string[];
+  values: string[];
+};
+
+export type MinibacHistoryEntry = {
+  questionId: string;
+  submissions: Record<string, MinibacSubmission>;
+};
+
+/** Met à jour vite `game_data.answers` (+ `minibac_history` si Mini-Bac). */
+export async function submitAnswerRemote(
+  roomCode: string,
+  playerId: string,
+  payload: {
+    questionId: string;
+    questionType: string;
+    answerStr: string;
+    minibac?: MinibacSubmission;
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const { data, error: fetchErr } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+
+  if (fetchErr || !data) {
+    return { ok: false, error: fetchErr?.message ?? "Salle introuvable." };
+  }
+
+  const gd = (data.game_data || {}) as Record<string, unknown>;
+  const prevAnswers =
+    typeof gd.answers === "object" && gd.answers !== null
+      ? (gd.answers as Record<string, string>)
+      : {};
+  const answers = { ...prevAnswers };
+
+  if (payload.questionType === "minibac" && payload.minibac) {
+    answers[playerId] = JSON.stringify({
+      type: "minibac",
+      letter: payload.minibac.letter,
+      categories: payload.minibac.categories,
+      values: payload.minibac.values,
+    });
+    const history: MinibacHistoryEntry[] = Array.isArray(gd.minibac_history)
+      ? [...(gd.minibac_history as MinibacHistoryEntry[])]
+      : [];
+    let entry = history.find((h) => h.questionId === payload.questionId);
+    if (!entry) {
+      entry = { questionId: payload.questionId, submissions: {} };
+      history.push(entry);
+    }
+    entry.submissions[playerId] = payload.minibac;
+
+    const { error: upErr } = await supabase
+      .from("rooms")
+      .update({
+        game_data: {
+          ...gd,
+          answers,
+          minibac_history: history,
+        },
+      })
+      .eq("code", roomCode.trim());
+
+    if (upErr) return { ok: false, error: upErr.message };
+    return { ok: true };
+  }
+
+  answers[playerId] = payload.answerStr;
+
+  const { error: upErr } = await supabase
+    .from("rooms")
+    .update({
+      game_data: {
+        ...gd,
+        answers,
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}
+
 export async function startGameRemote(roomCode: string, questionCount: number) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
@@ -160,8 +250,13 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
     .from("rooms")
     .update({
       game_state: "playing",
-      game_data: { questions: selectedQuestions, answers: {}, scores: {} }, // Ajout des scores à 0
-      current_question_index: 0
+      game_data: {
+        questions: selectedQuestions,
+        answers: {},
+        scores: {},
+        minibac_history: [] as MinibacHistoryEntry[],
+      },
+      current_question_index: 0,
     })
     .eq("code", roomCode);
 
@@ -169,36 +264,197 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
   return { ok: true };
 }
 
-export async function nextQuestionRemote(roomCode: string, nextIndex: number, currentQuestions: any[], currentScores: any) {
+export async function nextQuestionRemote(
+  roomCode: string,
+  nextIndex: number,
+  currentQuestions: unknown[],
+  currentScores: Record<string, number>,
+) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
+  const { data } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+
+  const gd = (data?.game_data || {}) as Record<string, unknown>;
+  const minibac_history = Array.isArray(gd.minibac_history)
+    ? gd.minibac_history
+    : [];
+
   const { error } = await supabase
     .from("rooms")
-    .update({ 
+    .update({
       current_question_index: nextIndex,
-      // On conserve les scores, on garde les questions, on vide les réponses !
-      game_data: { questions: currentQuestions, answers: {}, scores: currentScores }
+      game_data: {
+        ...gd,
+        questions: currentQuestions,
+        answers: {},
+        scores: currentScores,
+        minibac_history,
+      },
     })
-    .eq("code", roomCode);
+    .eq("code", roomCode.trim());
 
   return { ok: !error };
 }
 
-export async function endGameRemote(roomCode: string, finalScores: any) {
+export async function endGameRemote(
+  roomCode: string,
+  finalScores: Record<string, number>,
+) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
-  const { data: room } = await supabase.from("rooms").select("game_data").eq("code", roomCode).single();
-  const gameData = room?.game_data || {};
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+  const gameData = (room?.game_data || {}) as Record<string, unknown>;
+  const hadMinibac =
+    Array.isArray(gameData.minibac_history) &&
+    (gameData.minibac_history as unknown[]).length > 0;
 
   const { error } = await supabase
     .from("rooms")
-    .update({ 
+    .update({
       game_state: "finished",
-      game_data: { ...gameData, scores: finalScores }
+      game_data: {
+        ...gameData,
+        scores: finalScores,
+        tribunal_complete: !hadMinibac,
+        tribunal_cursor: 0,
+        tribunal_votes: {} as Record<string, Record<string, "accept" | "reject">>,
+      },
     })
-    .eq("code", roomCode);
+    .eq("code", roomCode.trim());
+
+  return { ok: !error };
+}
+
+export function buildTribunalVoteKey(questionId: string, playerId: string) {
+  return `${questionId}::${playerId}`;
+}
+
+export async function submitTribunalVoteRemote(
+  roomCode: string,
+  voterId: string,
+  targetQuestionId: string,
+  targetPlayerId: string,
+  vote: "accept" | "reject",
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const { data, error: fetchErr } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+
+  if (fetchErr || !data) {
+    return { ok: false, error: fetchErr?.message ?? "Salle introuvable." };
+  }
+
+  const gd = (data.game_data || {}) as Record<string, unknown>;
+  const key = buildTribunalVoteKey(targetQuestionId, targetPlayerId);
+  const prev = (gd.tribunal_votes || {}) as Record<
+    string,
+    Record<string, "accept" | "reject">
+  >;
+  const forTarget = { ...(prev[key] || {}) };
+  forTarget[voterId] = vote;
+  const tribunal_votes = { ...prev, [key]: forTarget };
+
+  const { error: upErr } = await supabase
+    .from("rooms")
+    .update({
+      game_data: { ...gd, tribunal_votes },
+    })
+    .eq("code", roomCode.trim());
+
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}
+
+/** Passe à la grille suivante (hôte). */
+export async function advanceTribunalRemote(roomCode: string) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false };
+
+  const { data } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+
+  const gd = (data?.game_data || {}) as Record<string, unknown>;
+  const cur = Number(gd.tribunal_cursor ?? 0);
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: { ...gd, tribunal_cursor: cur + 1 },
+    })
+    .eq("code", roomCode.trim());
+
+  return { ok: !error };
+}
+
+/** Ferme le Tribunal, applique les points Mini-Bac (votes majoritaires) et affiche le podium. */
+export async function finishTribunalRemote(roomCode: string) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false };
+
+  const { data } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+
+  const gd = (data?.game_data || {}) as Record<string, unknown>;
+  const questions = (gd.questions || []) as Array<{
+    id: string;
+    type?: string;
+    points?: number;
+  }>;
+  const scores = {
+    ...(typeof gd.scores === "object" && gd.scores !== null
+      ? (gd.scores as Record<string, number>)
+      : {}),
+  };
+  const tribunal_votes = (gd.tribunal_votes || {}) as Record<
+    string,
+    Record<string, "accept" | "reject">
+  >;
+  const minibac_history = (gd.minibac_history || []) as MinibacHistoryEntry[];
+
+  for (const entry of minibac_history) {
+    const q = questions.find((x) => x.id === entry.questionId);
+    if (!q || q.type !== "minibac") continue;
+    const pts = q.points ?? 200;
+    for (const playerId of Object.keys(entry.submissions || {})) {
+      const key = buildTribunalVoteKey(entry.questionId, playerId);
+      const v = tribunal_votes[key] || {};
+      const votes = Object.values(v);
+      if (votes.length === 0) continue;
+      const acc = votes.filter((x) => x === "accept").length;
+      const rej = votes.filter((x) => x === "reject").length;
+      if (acc > rej) {
+        scores[playerId] = (scores[playerId] || 0) + pts;
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: { ...gd, scores, tribunal_complete: true },
+    })
+    .eq("code", roomCode.trim());
 
   return { ok: !error };
 }
