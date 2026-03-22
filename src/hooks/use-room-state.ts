@@ -1,30 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 export function useRoomState(roomCode: string | null) {
   const [roomState, setRoomState] = useState<any>(null);
+
+  const refreshRoomState = useCallback(async () => {
+    if (!roomCode) return;
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    const { data } = await supabase.from("rooms").select("*").eq("code", roomCode.trim()).single();
+    if (data) setRoomState(data);
+  }, [roomCode]);
 
   useEffect(() => {
     if (!roomCode) return;
     const supabase = getSupabaseBrowser();
     if (!supabase) return;
 
-    // Récupère l'état initial (lobby)
-    supabase.from("rooms").select("*").eq("code", roomCode).single().then(({ data }) => {
-      if (data) setRoomState(data);
-    });
+    void refreshRoomState();
 
-    // Écoute les changements (quand l'hôte lance le jeu)
-    const channel = supabase.channel(`room_state:${roomCode}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${roomCode}` }, (payload) => {
+    const code = roomCode.trim();
+    const channel = supabase.channel(`room_state:${code}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` }, (payload) => {
         setRoomState(payload.new);
       })
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
-  }, [roomCode]);
+  }, [roomCode, refreshRoomState]);
 
-  return roomState;
+  return { roomState, refreshRoomState };
 }

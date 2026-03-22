@@ -44,7 +44,7 @@ export default function GameApp() {
   const [startError, setStartError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const roomState = useRoomState(roomCode);
+  const { roomState, refreshRoomState } = useRoomState(roomCode);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -200,15 +200,18 @@ export default function GameApp() {
 
   const handleStartGame = async () => {
     setStartError(null);
-    if (remote && roomCode) {
+    if (!roomCode) return;
+    if (remote) {
       setBusy(true);
       const result = await startGameRemote(roomCode, questionCount);
       setBusy(false);
-      
+
       if (!result.ok) {
-        // CORRECTION VERCEL ICI 👇
         setStartError(result.error || "Erreur inconnue au lancement");
+        return;
       }
+      await refreshRoomState();
+      setView("playing");
     }
   };
 

@@ -320,7 +320,7 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
       },
       current_question_index: 0,
     })
-    .eq("code", roomCode);
+    .eq("code", roomCode.trim());
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
