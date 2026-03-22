@@ -39,6 +39,29 @@ const GET_DURATION = (type: string) => {
 
 const REVEAL_DURATION = 6;
 
+function PlayerFace({
+  player,
+  className = "h-7 w-7",
+}: {
+  player: Player;
+  className?: string;
+}) {
+  const hasImg = player.avatar && player.avatar.startsWith("data:image");
+  return (
+    <span
+      title={player.name}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[9px] font-bold uppercase text-white ring-2 ring-white shadow-sm ${className}`}
+    >
+      {hasImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={player.avatar!} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span>{player.name.slice(0, 2)}</span>
+      )}
+    </span>
+  );
+}
+
 function parseYear(s: string): number | null {
   const n = parseInt(String(s).replace(/\D/g, ""), 10);
   return Number.isFinite(n) ? n : null;
@@ -572,6 +595,15 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const myPoints = pointsEarnedThisRound[myPlayerId] || 0;
   const myMinibac = parseMinibacAnswer(myAnswer);
 
+  const showPeerTextAnswers =
+    phase === "reveal" &&
+    !isMinibac &&
+    (currentQuestion.type === "open" ||
+      currentQuestion.type === "estimation" ||
+      currentQuestion.type === "date" ||
+      currentQuestion.type === "geo_flag" ||
+      currentQuestion.type === "geo_shape");
+
   const submitLockedClass =
     hasLockedAnswer && phase === "question"
       ? "bg-emerald-600 text-white shadow-emerald-500/40"
@@ -759,6 +791,35 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       </div>
                     )}
                     <p className="text-4xl font-black text-green-500">{String(currentQuestion.answer)}</p>
+
+                    {showPeerTextAnswers && players.some((p) => p.id !== myPlayerId) && (
+                      <div className="mt-4 w-full max-w-full rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2.5 text-left shadow-inner">
+                        <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Les autres
+                        </p>
+                        <ul className="max-h-[min(30vh,200px)] space-y-1.5 overflow-y-auto pr-0.5">
+                          {players
+                            .filter((p) => p.id !== myPlayerId)
+                            .map((p) => {
+                              const txt = answers[p.id];
+                              return (
+                                <li key={p.id} className="flex items-start gap-2">
+                                  <PlayerFace player={p} className="mt-0.5 h-6 w-6 sm:h-7 sm:w-7" />
+                                  <div className="min-w-0 flex-1">
+                                    <span className="block truncate text-[10px] font-semibold text-slate-400">
+                                      {p.name}
+                                    </span>
+                                    <span className="line-clamp-3 break-words text-sm font-bold leading-snug text-slate-800">
+                                      {txt != null && String(txt).trim() !== "" ? txt : "—"}
+                                    </span>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                        </ul>
+                      </div>
+                    )}
+
                     <div className="h-px w-full bg-slate-200 my-4"></div>
                     <p className="text-sm font-bold text-slate-500">
                       Ton choix :{" "}
@@ -793,6 +854,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
 
             const choiceLocked = localAnswer !== null || myAnswer !== null;
 
+            const pickedHere = players.filter(
+              (p) => String(answers[p.id] ?? "").trim() === String(option).trim(),
+            );
+
             return (
               <motion.button
                 key={i}
@@ -800,13 +865,22 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleAnswerClick(option)}
                 disabled={choiceLocked || phase !== "question"}
-                className={`relative w-full overflow-hidden rounded-xl border p-3.5 text-sm font-bold shadow-sm transition-all sm:rounded-2xl sm:p-5 sm:text-lg ${revealClass} ${!choiceLocked && phase === "question" ? "cursor-pointer hover:shadow-md" : "cursor-default"}`}
+                className={`flex w-full flex-col items-stretch overflow-hidden rounded-xl border p-3.5 text-sm font-bold shadow-sm transition-all sm:rounded-2xl sm:p-5 sm:text-lg ${revealClass} ${!choiceLocked && phase === "question" ? "cursor-pointer hover:shadow-md" : "cursor-default"}`}
               >
-                {option}
-                {phase === "reveal" && option === currentQuestion.answer && myPoints > 0 && (
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white font-black drop-shadow-md">
-                    +{myPoints}
-                  </span>
+                <div className="flex w-full items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1 text-left leading-snug">{option}</span>
+                  {phase === "reveal" && option === currentQuestion.answer && myPoints > 0 && (
+                    <span className="shrink-0 text-base font-black text-white drop-shadow-md sm:text-lg">
+                      +{myPoints}
+                    </span>
+                  )}
+                </div>
+                {phase === "reveal" && pickedHere.length > 0 && (
+                  <div className="mt-2 flex flex-wrap justify-center gap-1 border-t border-black/10 pt-2">
+                    {pickedHere.map((p) => (
+                      <PlayerFace key={p.id} player={p} className="h-6 w-6 sm:h-7 sm:w-7" />
+                    ))}
+                  </div>
                 )}
               </motion.button>
             );
