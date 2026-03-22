@@ -7,7 +7,20 @@ import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 type RealtimeState = "idle" | "connecting" | "subscribed" | "error";
 
-export function useLobbyPlayers(roomCode: string | null, enabled: boolean) {
+export type UseLobbyPlayersOptions = {
+  /** Si tu n’es pas l’hôte, on écoute la suppression de la salle pour expulser tout le monde. */
+  isHost?: boolean;
+  onRoomClosedByHost?: () => void;
+};
+
+export function useLobbyPlayers(
+  roomCode: string | null,
+  enabled: boolean,
+  options?: UseLobbyPlayersOptions,
+) {
+  const isHost = options?.isHost ?? false;
+  const onRoomClosedRef = useRef(options?.onRoomClosedByHost);
+  onRoomClosedRef.current = options?.onRoomClosedByHost;
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,37 +69,53 @@ export function useLobbyPlayers(roomCode: string | null, enabled: boolean) {
       if (!cancelled) setLoading(false);
     })();
 
-    const channel = supabase
-      .channel(`lobby:${roomCode}`, {
-        config: { broadcast: { self: true } },
-      })
-      .on(
+    let channel = supabase.channel(`lobby:${roomCode}`, {
+      config: { broadcast: { self: true } },
+    });
+
+    channel = channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "lobby_players",
+        filter: `room_code=eq.${roomCode}`,
+      },
+      () => {
+        void reloadRef.current();
+      },
+    );
+
+    if (!isHost) {
+      channel = channel.on(
         "postgres_changes",
         {
-          event: "*",
+          event: "DELETE",
           schema: "public",
-          table: "lobby_players",
-          filter: `room_code=eq.${roomCode}`,
+          table: "rooms",
+          filter: `code=eq.${roomCode}`,
         },
         () => {
-          void reloadRef.current();
+          onRoomClosedRef.current?.();
         },
-      )
-      .subscribe((status, err) => {
-        if (cancelled) return;
-        if (status === "SUBSCRIBED") {
-          setRealtimeState("subscribed");
-        } else if (status === "CHANNEL_ERROR" || err) {
-          setRealtimeState("error");
-        }
-      });
+      );
+    }
+
+    channel.subscribe((status, err) => {
+      if (cancelled) return;
+      if (status === "SUBSCRIBED") {
+        setRealtimeState("subscribed");
+      } else if (status === "CHANNEL_ERROR" || err) {
+        setRealtimeState("error");
+      }
+    });
 
     return () => {
       cancelled = true;
       void supabase.removeChannel(channel);
       setRealtimeState("idle");
     };
-  }, [enabled, roomCode]);
+  }, [enabled, roomCode, isHost]);
 
   return {
     players,

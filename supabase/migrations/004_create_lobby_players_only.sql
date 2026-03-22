@@ -1,12 +1,7 @@
--- Exécuter ce script dans Supabase → SQL Editor (nouveau projet ou base existante).
+-- Si tu n’as que la table `rooms` : exécute CE script entier dans Supabase → SQL Editor.
+-- Il crée `lobby_players` (liste des joueurs), les politiques RLS, le temps réel et les droits.
 
-create table if not exists public.rooms (
-  id uuid primary key default gen_random_uuid(),
-  code text not null unique,
-  constraint rooms_code_len check (char_length(code) = 4),
-  created_at timestamptz not null default now()
-);
-
+-- 1) Table des joueurs dans la salle (liée au code de la salle)
 create table if not exists public.lobby_players (
   id uuid primary key default gen_random_uuid(),
   room_code text not null references public.rooms (code) on delete cascade,
@@ -16,14 +11,8 @@ create table if not exists public.lobby_players (
 
 create index if not exists lobby_players_room_code_idx on public.lobby_players (room_code);
 
-alter table public.rooms enable row level security;
+-- 2) RLS
 alter table public.lobby_players enable row level security;
-
-drop policy if exists "rooms_read" on public.rooms;
-create policy "rooms_read" on public.rooms for select using (true);
-
-drop policy if exists "rooms_insert" on public.rooms;
-create policy "rooms_insert" on public.rooms for insert with check (true);
 
 drop policy if exists "lobby_players_read" on public.lobby_players;
 create policy "lobby_players_read" on public.lobby_players for select using (true);
@@ -31,12 +20,11 @@ create policy "lobby_players_read" on public.lobby_players for select using (tru
 drop policy if exists "lobby_players_insert" on public.lobby_players;
 create policy "lobby_players_insert" on public.lobby_players for insert with check (true);
 
-drop policy if exists "rooms_delete" on public.rooms;
-create policy "rooms_delete" on public.rooms for delete using (true);
-
 drop policy if exists "lobby_players_delete" on public.lobby_players;
 create policy "lobby_players_delete" on public.lobby_players for delete using (true);
 
--- Temps réel : joueurs + fermeture de salle (kick quand l’hôte part)
+-- 3) Temps réel (ignore l’erreur si la table est déjà dans la publication)
 alter publication supabase_realtime add table public.lobby_players;
-alter publication supabase_realtime add table public.rooms;
+
+-- 4) Droits pour l’API (clé anon)
+grant select, insert, update, delete on table public.lobby_players to anon, authenticated;

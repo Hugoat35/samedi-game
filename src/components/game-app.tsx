@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLobbyPlayers } from "@/hooks/use-lobby-players";
 import { useSupabasePing } from "@/hooks/use-supabase-ping";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -36,6 +36,21 @@ export default function GameApp() {
   const [busy, setBusy] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
+  const [isLeavingRoom, setIsLeavingRoom] = useState(false);
+  const [homeNotice, setHomeNotice] = useState<string | null>(null);
+
+  const handleKickedByHost = useCallback(() => {
+    setIsLeavingRoom(false);
+    setView("home");
+    setRoomCode(null);
+    setMyPlayerId(null);
+    setIsHost(false);
+    setLocalPlayers([]);
+    setPin("");
+    setJoinError(null);
+    setBusy(false);
+    setHomeNotice("L’hôte a quitté la salle.");
+  }, []);
 
   const {
     players: remotePlayers,
@@ -43,20 +58,47 @@ export default function GameApp() {
     error: remoteError,
     realtimeState,
     lastEventAt,
-  } = useLobbyPlayers(roomCode, Boolean(remote && view === "lobby"));
+  } = useLobbyPlayers(
+    roomCode,
+    Boolean(remote && view === "lobby"),
+    remote
+      ? { isHost, onRoomClosedByHost: handleKickedByHost }
+      : undefined,
+  );
+
+  useEffect(() => {
+    if (remote || view !== "lobby" || !roomCode || isHost) return;
+    if (typeof BroadcastChannel === "undefined") return;
+    const bc = new BroadcastChannel(`samedi-lobby-${roomCode}`);
+    bc.onmessage = (ev: MessageEvent) => {
+      if (ev.data?.type === "room_closed") {
+        handleKickedByHost();
+      }
+    };
+    return () => {
+      bc.close();
+    };
+  }, [remote, view, roomCode, isHost, handleKickedByHost]);
 
   const pingMs = useSupabasePing(Boolean(remote && view === "lobby"));
 
-  const players = remote ? remotePlayers : localPlayers;
+  const playersRaw = remote ? remotePlayers : localPlayers;
+  const players =
+    isLeavingRoom && myPlayerId
+      ? playersRaw.filter((p) => p.id !== myPlayerId)
+      : playersRaw;
 
   const goHome = useCallback(async () => {
+    setHomeNotice(null);
     setJoinError(null);
     if (roomCode && myPlayerId) {
+      setIsLeavingRoom(true);
       if (remote) {
         setBusy(true);
         const left = await leaveRoomRemote(roomCode, myPlayerId, isHost);
         setBusy(false);
         if (!left.ok) {
+          setIsLeavingRoom(false);
           setJoinError(left.error);
           return;
         }
@@ -64,6 +106,7 @@ export default function GameApp() {
         mockLobbyStore.leaveRoom(roomCode, myPlayerId);
       }
     }
+    setIsLeavingRoom(false);
     setView("home");
     setRoomCode(null);
     setLocalPlayers([]);
@@ -75,6 +118,7 @@ export default function GameApp() {
   }, [remote, roomCode, myPlayerId, isHost]);
 
   const handleCreate = async () => {
+    setHomeNotice(null);
     setJoinError(null);
     if (remote) {
       setBusy(true);
@@ -99,6 +143,7 @@ export default function GameApp() {
   };
 
   const handleJoinClick = () => {
+    setHomeNotice(null);
     setJoinError(null);
     setPin("");
     setView("join");
@@ -180,6 +225,14 @@ export default function GameApp() {
               <p className="text-center text-sm leading-relaxed text-slate-600">
                 Lance une salle ou rejoins tes amis avec un code à 4 chiffres.
               </p>
+              {homeNotice && (
+                <p
+                  className="text-center text-sm font-medium text-amber-900"
+                  role="status"
+                >
+                  {homeNotice}
+                </p>
+              )}
               {joinError && (
                 <p
                   className="text-center text-sm font-medium text-red-600"

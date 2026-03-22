@@ -62,6 +62,15 @@ export const mockLobbyStore = {
     const p = room.players.find((x) => x.id === playerId);
     if (!p) return;
     if (p.name === "Hôte") {
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`samedi-lobby-${room.code}`);
+          bc.postMessage({ type: "room_closed" });
+          bc.close();
+        } catch {
+          /* ignore */
+        }
+      }
       rooms.delete(room.code);
       return;
     }
