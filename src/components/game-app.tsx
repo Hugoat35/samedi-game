@@ -4,14 +4,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useLobbyPlayers } from "@/hooks/use-lobby-players";
 import { isSupabaseConfigured } from "@/lib/env";
+import NetworkDebugPanel from "@/components/network-debug-panel";
 import { createRoomRemote, joinRoomRemote, leaveRoomRemote } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
-type View = "home" | "join" | "lobby";
+type View = "home" | "join" | "create" | "lobby";
 
-const EMOJIS = ["😎", "🤪", "🤠", "👽", "🤖", "👻"];
 const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
@@ -33,12 +33,12 @@ export default function GameApp() {
   const [isHost, setIsHost] = useState(false);
   const [isLeavingRoom, setIsLeavingRoom] = useState(false);
   
-  // Nouveaux états pour le profil
+  // États pour le profil
   const [pseudo, setPseudo] = useState("");
-  const [avatar, setAvatar] = useState<string>(EMOJIS[0]);
+  const [avatar, setAvatar] = useState<string | null>(null); // Plus d'emojis, null par défaut
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fonction pour traiter et redimensionner la photo de l'iPhone
+  // Traitement et redimensionnement de la photo
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -47,7 +47,7 @@ export default function GameApp() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const size = 150; // On réduit à 150x150 pixels pour que ce soit super léger !
+        const size = 150;
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext("2d");
@@ -56,7 +56,7 @@ export default function GameApp() {
           const sx = (img.width - min) / 2;
           const sy = (img.height - min) / 2;
           ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
-          setAvatar(canvas.toDataURL("image/jpeg", 0.7)); // Qualité 70%
+          setAvatar(canvas.toDataURL("image/jpeg", 0.7));
         }
       };
       img.src = event.target?.result as string;
@@ -126,13 +126,16 @@ export default function GameApp() {
     setMyPlayerId(null);
     setIsHost(false);
     setPin("");
+    setPseudo(""); // Réinitialiser le profil
+    setAvatar(null);
   }, [remote, roomCode, myPlayerId, isHost]);
 
-  const handleCreate = async () => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setJoinError(null);
     if (remote) {
       setBusy(true);
-      const result = await createRoomRemote(pseudo.trim() || "Anonyme", avatar);
+      const result = await createRoomRemote(pseudo.trim() || "Anonyme", avatar || "");
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
@@ -144,7 +147,7 @@ export default function GameApp() {
       }
       return;
     }
-    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom(pseudo.trim(), avatar);
+    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom(pseudo.trim(), avatar || "");
     setRoomCode(code);
     setLocalPlayers(p);
     setMyPlayerId(id);
@@ -156,7 +159,7 @@ export default function GameApp() {
     e.preventDefault();
     if (remote) {
       setBusy(true);
-      const result = await joinRoomRemote(pin, pseudo.trim() || "Anonyme", avatar);
+      const result = await joinRoomRemote(pin, pseudo.trim() || "Anonyme", avatar || "");
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
@@ -168,13 +171,15 @@ export default function GameApp() {
       }
       return;
     }
-    const result = mockLobbyStore.joinRoom(pin, pseudo.trim(), avatar);
+    const result = mockLobbyStore.joinRoom(pin, pseudo.trim(), avatar || "");
     if (result.ok) {
       setRoomCode(result.code);
       setLocalPlayers(result.players);
       setMyPlayerId(result.myPlayerId);
       setIsHost(false);
       setView("lobby");
+    } else {
+      setJoinError(result.error);
     }
   };
 
@@ -194,76 +199,95 @@ export default function GameApp() {
 
       <main className="relative z-10 flex flex-1 flex-col">
         <AnimatePresence mode="wait">
+          
+          {/* VUE ACCUEIL : Ultra épurée */}
           {view === "home" && (
-            <motion.section key="home" className="flex flex-1 flex-col justify-center gap-6" {...pageTransition}>
-              
-              {/* --- SECTION PROFIL --- */}
-              <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
-                <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Ton Profil</h2>
-                
-                {/* L'Avatar cliquable pour ouvrir la caméra */}
-                <div 
-                  className="relative h-24 w-24 rounded-full bg-white flex items-center justify-center text-4xl shadow-md cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {avatar.startsWith("data:image") ? (
-                    <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
-                  ) : (
-                    <span>{avatar}</span>
-                  )}
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
-                    <span className="text-white text-2xl">📷</span>
-                  </div>
-                </div>
-                
-                {/* Input caché pour le fichier */}
-                <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
-
-                {/* Choix d'emojis rapides */}
-                <div className="flex gap-3 mt-1">
-                  {EMOJIS.map(e => (
-                    <button key={e} onClick={() => setAvatar(e)} className={`text-2xl transition ${avatar === e ? 'scale-125 drop-shadow-md' : 'opacity-50 hover:opacity-100'}`}>
-                      {e}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Entre ton pseudo..."
-                  value={pseudo}
-                  onChange={(e) => setPseudo(e.target.value)}
-                  maxLength={15}
-                  className="w-full rounded-2xl border-none bg-white/90 px-4 py-4 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
-                />
-              </div>
-
-              {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
-              
-              <div className="flex flex-col gap-4">
-                <button onClick={handleCreate} disabled={busy || !pseudo.trim()} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-40">
-                  {busy ? "Création…" : "Créer une partie"}
-                </button>
-                <button onClick={() => setView("join")} disabled={busy || !pseudo.trim()} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-sm transition hover:bg-white disabled:opacity-40">
-                  Rejoindre une partie
-                </button>
-              </div>
+            <motion.section key="home" className="flex flex-1 flex-col justify-center gap-4" {...pageTransition}>
+              <button onClick={() => setView("create")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105">
+                Créer une partie
+              </button>
+              <button onClick={() => setView("join")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-sm transition hover:bg-white">
+                Rejoindre une partie
+              </button>
             </motion.section>
           )}
 
+          {/* VUE CRÉATION : Profil -> Créer */}
+          {view === "create" && (
+            <motion.section key="create" className="flex flex-1 flex-col justify-center" {...pageTransition}>
+              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
+                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
+                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Créer une salle</h2>
+                  
+                  <div 
+                    className="relative h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Optionnel)</span>
+                    )}
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
+                      <span className="text-white text-2xl">📷</span>
+                    </div>
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+
+                  <input
+                    type="text" required placeholder="Entre ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
+                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-4 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                  />
+                </div>
+
+                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
+                
+                <button type="submit" disabled={busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
+                  {busy ? "Création en cours…" : "Confirmer et Créer"}
+                </button>
+                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
+              </form>
+            </motion.section>
+          )}
+
+          {/* VUE REJOINDRE : Code + Profil -> Rejoindre */}
           {view === "join" && (
             <motion.section key="join" className="flex flex-1 flex-col justify-center" {...pageTransition}>
               <form onSubmit={handleJoinSubmit} className="flex flex-col gap-6">
-                <div>
-                  <label className="mb-3 block text-center text-sm font-medium text-slate-700">Code à 4 chiffres</label>
+                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
+                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Rejoindre une salle</h2>
+                  
                   <input
-                    inputMode="numeric" pattern="\d{4}" maxLength={4} placeholder="• • • •"
+                    inputMode="numeric" pattern="\d{4}" maxLength={4} required placeholder="Code : • • • •"
                     value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    className="w-full rounded-[1.5rem] border-none bg-white/95 px-6 py-5 text-center font-mono text-3xl tracking-[0.5em] text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-violet-400/50"
+                    className="w-full rounded-[1.5rem] border-none bg-white/95 px-6 py-4 text-center font-mono text-2xl tracking-[0.2em] text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-violet-400/50"
+                  />
+                  
+                  <div className="h-px w-full bg-slate-200/50 my-2"></div>
+
+                  <div 
+                    className="relative h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Opt)</span>
+                    )}
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
+                      <span className="text-white text-xl">📷</span>
+                    </div>
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+
+                  <input
+                    type="text" required placeholder="Ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
+                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-3 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
                   />
                 </div>
+
                 {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
-                <button type="submit" disabled={pin.length !== 4 || busy} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
+                <button type="submit" disabled={pin.length !== 4 || busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
                   {busy ? "Connexion…" : "Entrer dans la salle"}
                 </button>
                 <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
@@ -271,6 +295,7 @@ export default function GameApp() {
             </motion.section>
           )}
 
+          {/* VUE LOBBY : Les joueurs ! */}
           {view === "lobby" && roomCode && (
             <motion.section key="lobby" className="flex flex-1 flex-col" {...pageTransition}>
               <div className="mb-8 rounded-[2rem] bg-white/85 p-6 shadow-sm backdrop-blur-md">
@@ -287,12 +312,12 @@ export default function GameApp() {
                     {players.map((p, i) => (
                       <motion.li key={p.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm">
                         
-                        {/* Affichage de l'avatar des joueurs ! */}
-                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-100 text-2xl shadow-inner overflow-hidden border-2 border-white">
+                        {/* Avatar photo OU Initiales */}
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-lg font-bold text-white shadow-inner overflow-hidden border-2 border-white">
                           {p.avatar && p.avatar.startsWith("data:image") ? (
                             <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" />
                           ) : (
-                            <span>{p.avatar || "👾"}</span>
+                            <span>{p.name.slice(0, 2).toUpperCase()}</span>
                           )}
                         </span>
                         
