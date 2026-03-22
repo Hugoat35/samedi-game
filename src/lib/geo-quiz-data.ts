@@ -1,6 +1,6 @@
 /**
  * Données pour questions géo (drapeaux / silhouettes).
- * `code` = ISO 3166-1 alpha-2 (flagcdn + mapsicon).
+ * `code` = ISO 3166-1 alpha-2 (flagcdn + mapsicon `all/{code}/128.png`).
  */
 export type GeoRow = {
   code: string;

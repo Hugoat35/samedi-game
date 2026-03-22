@@ -33,10 +33,10 @@ export function buildGeoFlagUrl(countryCode: string): string {
 
 /**
  * Silhouette du pays (PNG) — jeu d’icônes mapsicon (GitHub).
- * Même code ISO que pour le drapeau.
+ * Les fichiers sont sous `all/{code iso}/128.png`, pas `countries/…`.
  */
 export function buildGeoShapeUrl(countryCode: string): string {
-  return `https://cdn.jsdelivr.net/gh/djaiss/mapsicon@master/countries/${countryCode.toLowerCase()}/128.png`;
+  return `https://cdn.jsdelivr.net/gh/djaiss/mapsicon@master/all/${countryCode.toLowerCase()}/128.png`;
 }
 
 const GEO_FLAG_QUESTIONS: QuizQuestion[] = GEO_FLAG_ROWS.map((r, i) => ({
