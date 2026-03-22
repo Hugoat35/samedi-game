@@ -73,6 +73,7 @@ export function useLobbyPlayers(
       config: { broadcast: { self: true } },
     });
 
+    // Écoute les changements dans la base de données
     channel = channel.on(
       "postgres_changes",
       {
@@ -100,6 +101,24 @@ export function useLobbyPlayers(
         },
       );
     }
+
+    // --- NOUVEAU : Écoute des signaux instantanés (Broadcast) ---
+    channel = channel.on(
+      "broadcast",
+      { event: "room_closed" },
+      () => {
+        onRoomClosedRef.current?.();
+      }
+    );
+
+    channel = channel.on(
+      "broadcast",
+      { event: "player_left" },
+      () => {
+        void reloadRef.current();
+      }
+    );
+    // -------------------------------------------------------------
 
     channel.subscribe((status, err) => {
       if (cancelled) return;

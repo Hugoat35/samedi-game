@@ -13,6 +13,7 @@ import {
 } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
+import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 type View = "home" | "join" | "lobby";
 
@@ -80,6 +81,26 @@ export default function GameApp() {
     };
   }, [remote, view, roomCode, isHost, handleKickedByHost]);
 
+  // --- NOUVEAU CODE : Gérer la fermeture de la page / de l'onglet ---
+  useEffect(() => {
+    if (!remote || view !== "lobby" || !roomCode || !myPlayerId) return;
+
+    const handleBeforeUnload = () => {
+      const supabase = getSupabaseBrowser();
+      if (supabase) {
+        // Envoie un dernier signal avant que la page ne meure
+        supabase.channel(`lobby:${roomCode}`).send({
+          type: "broadcast",
+          event: isHost ? "room_closed" : "player_left"
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [remote, view, roomCode, myPlayerId, isHost]);
+  // ------------------------------------------------------------------
+
   const pingMs = useSupabasePing(Boolean(remote && view === "lobby"));
 
   const playersRaw = remote ? remotePlayers : localPlayers;
@@ -95,6 +116,17 @@ export default function GameApp() {
       setIsLeavingRoom(true);
       if (remote) {
         setBusy(true);
+        
+        // --- NOUVEAU CODE : Envoyer le signal instantané aux autres ---
+        const supabase = getSupabaseBrowser();
+        if (supabase) {
+          await supabase.channel(`lobby:${roomCode}`).send({
+            type: "broadcast",
+            event: isHost ? "room_closed" : "player_left"
+          }).catch(() => {});
+        }
+        // --------------------------------------------------------------
+
         const left = await leaveRoomRemote(roomCode, myPlayerId, isHost);
         setBusy(false);
         if (!left.ok) {
