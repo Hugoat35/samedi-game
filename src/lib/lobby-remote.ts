@@ -254,6 +254,12 @@ async function submitAnswerRemoteLegacy(
       ? (gd.answers as Record<string, string>)
       : {};
   const answers = { ...prevAnswers };
+  const prevOrder = Array.isArray(gd.answer_order)
+    ? [...(gd.answer_order as string[])]
+    : [];
+  if (!(playerId in prevAnswers)) {
+    prevOrder.push(playerId);
+  }
 
   if (payload.questionType === "minibac" && payload.minibac) {
     answers[playerId] = JSON.stringify({
@@ -279,6 +285,7 @@ async function submitAnswerRemoteLegacy(
           ...gd,
           answers,
           minibac_history: history,
+          answer_order: prevOrder,
         },
       })
       .eq("code", roomCode.trim());
@@ -295,6 +302,7 @@ async function submitAnswerRemoteLegacy(
       game_data: {
         ...gd,
         answers,
+        answer_order: prevOrder,
       },
     })
     .eq("code", roomCode.trim());
@@ -380,6 +388,7 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
         answers: {},
         scores: {},
         minibac_history: [] as MinibacHistoryEntry[],
+        answer_order: [] as string[],
       },
       current_question_index: 0,
     })
@@ -419,6 +428,7 @@ export async function nextQuestionRemote(
         answers: {},
         scores: currentScores,
         minibac_history,
+        answer_order: [] as string[],
       },
     })
     .eq("code", roomCode.trim());

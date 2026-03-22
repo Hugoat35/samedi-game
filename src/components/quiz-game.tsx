@@ -41,6 +41,38 @@ const REVEAL_DURATION = 6;
 /** Dès qu’un joueur a validé son Mini-Bac, le temps restant pour tout le monde est plafonné à 10 s. */
 const MINIBAC_RUSH_SECONDS = 10;
 
+/**
+ * Bonus « premier arrivé » : pool total ≈ proportionnel au nombre de joueurs,
+ * réparti entre ceux qui ont marqué des points sur la question, du plus rapide au plus lent.
+ */
+function distributeSpeedBonus(
+  earnedPoints: Record<string, number>,
+  answerOrder: string[],
+  numPlayers: number,
+): Record<string, number> {
+  const bonus: Record<string, number> = {};
+  const winners = Object.entries(earnedPoints)
+    .filter(([, pts]) => pts > 0)
+    .map(([id]) => id);
+  if (winners.length === 0 || numPlayers < 1) return bonus;
+
+  const orderIndex = (id: string) => {
+    const i = answerOrder.indexOf(id);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  winners.sort((a, b) => orderIndex(a) - orderIndex(b));
+
+  const K = winners.length;
+  const totalPool = Math.round(6 * numPlayers);
+  const weightSum = (K * (K + 1)) / 2;
+  winners.forEach((pid, idx) => {
+    const rank = idx + 1;
+    const weight = K - rank + 1;
+    bonus[pid] = Math.round((totalPool * weight) / weightSum);
+  });
+  return bonus;
+}
+
 function PlayerFace({
   player,
   className = "h-7 w-7",
@@ -203,6 +235,15 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     const earned: Record<string, number> = {};
     const pts = currentQuestion.points;
 
+    const withSpeedBonus = (e: Record<string, number>) => {
+      const answerOrder = (roomState?.game_data?.answer_order as string[] | undefined) ?? [];
+      const speedBonus = distributeSpeedBonus(e, answerOrder, Math.max(players.length, 1));
+      Object.entries(speedBonus).forEach(([id, b]) => {
+        e[id] = (e[id] || 0) + b;
+      });
+      return e;
+    };
+
     if (currentQuestion.type === "minibac") {
       return earned;
     }
@@ -221,7 +262,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         earned[ans.pId] =
           ans.dist === 0 ? currentQuestion.points + 50 : pointsDistribution[idx] || 0;
       });
-      return earned;
+      return withSpeedBonus(earned);
     }
 
     if (currentQuestion.type === "date") {
@@ -233,7 +274,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         if (d === 0) earned[pId] = pts;
         else if (d <= 3) earned[pId] = Math.floor(pts * 0.5);
       });
-      return earned;
+      return withSpeedBonus(earned);
     }
 
     if (
@@ -248,7 +289,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           earned[pId] = pts;
         }
       });
-      return earned;
+      return withSpeedBonus(earned);
     }
 
     Object.entries(answers).forEach(([pId, ans]) => {
@@ -258,8 +299,8 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         earned[pId] = pts;
       }
     });
-    return earned;
-  }, [phase, answers, currentQuestion]);
+    return withSpeedBonus(earned);
+  }, [phase, answers, currentQuestion, roomState?.game_data?.answer_order, players.length]);
 
   useEffect(() => {
     if (phase !== "reveal" || gameState !== "playing") return;
