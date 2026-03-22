@@ -1,83 +1,42 @@
-import type { Player } from "@/lib/lobby-types";
+import type { Player } from "./lobby-types";
 
-export type { Player };
+let currentRoomCode: string | null = null;
+let currentPlayers: Player[] = [];
 
-type Room = {
-  code: string;
-  players: Player[];
-};
-
-const rooms = new Map<string, Room>();
-
-function randomId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function generateUniqueCode(): string {
-  let code: string;
-  do {
-    code = String(Math.floor(1000 + Math.random() * 9000));
-  } while (rooms.has(code));
-  return code;
+function randomCode(): string {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 export const mockLobbyStore = {
-  createRoom(): { code: string; players: Player[]; myPlayerId: string } {
-    const code = generateUniqueCode();
-    const hostId = randomId();
-    const room: Room = {
-      code,
-      players: [{ id: hostId, name: "Hôte" }],
+  createRoom(playerName: string, avatar: string) {
+    currentRoomCode = randomCode();
+    const hostId = "host-id-" + Math.random().toString(36).slice(2);
+    currentPlayers = [{ id: hostId, name: playerName, avatar }];
+    return {
+      code: currentRoomCode,
+      players: [...currentPlayers],
+      myPlayerId: hostId,
     };
-    rooms.set(code, room);
-    return { code, players: [...room.players], myPlayerId: hostId };
   },
-
-  joinRoom(codeInput: string):
-    | { ok: true; code: string; players: Player[]; myPlayerId: string }
-    | { ok: false; error: string } {
-    const code = codeInput.trim();
-    if (!/^\d{4}$/.test(code)) {
-      return { ok: false, error: "Le code doit contenir 4 chiffres." };
+  joinRoom(pin: string, playerName: string, avatar: string) {
+    if (!currentRoomCode || currentRoomCode !== pin) {
+      return { ok: false as const, error: "Salle introuvable (Mock)." };
     }
-    const room = rooms.get(code);
-    if (!room) {
-      return { ok: false, error: "Aucune salle ne correspond à ce code." };
-    }
-    const nextNum = room.players.length + 1;
-    const id = randomId();
-    room.players.push({
-      id,
-      name: `Joueur ${nextNum}`,
-    });
-    return { ok: true, code, players: [...room.players], myPlayerId: id };
+    const myId = "player-id-" + Math.random().toString(36).slice(2);
+    currentPlayers.push({ id: myId, name: playerName, avatar });
+    return {
+      ok: true as const,
+      code: currentRoomCode,
+      players: [...currentPlayers],
+      myPlayerId: myId,
+    };
   },
-
-  leaveRoom(roomCode: string, playerId: string): void {
-    const room = rooms.get(roomCode.trim());
-    if (!room) return;
-    const p = room.players.find((x) => x.id === playerId);
-    if (!p) return;
-    if (p.name === "Hôte") {
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`samedi-lobby-${room.code}`);
-          bc.postMessage({ type: "room_closed" });
-          bc.close();
-        } catch {
-          /* ignore */
-        }
+  leaveRoom(pin: string, playerId: string) {
+    if (currentRoomCode === pin) {
+      currentPlayers = currentPlayers.filter((p) => p.id !== playerId);
+      if (currentPlayers.length === 0) {
+        currentRoomCode = null;
       }
-      rooms.delete(room.code);
-      return;
     }
-    room.players = room.players.filter((x) => x.id !== playerId);
-  },
-
-  getRoom(code: string): Room | undefined {
-    return rooms.get(code.trim());
   },
 };

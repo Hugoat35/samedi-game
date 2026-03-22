@@ -1,24 +1,18 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useLobbyPlayers } from "@/hooks/use-lobby-players";
-import { useSupabasePing } from "@/hooks/use-supabase-ping";
 import { isSupabaseConfigured } from "@/lib/env";
-import NetworkDebugPanel from "@/components/network-debug-panel";
-import {
-  createRoomRemote,
-  joinRoomRemote,
-  leaveRoomRemote,
-} from "@/lib/lobby-remote";
+import { createRoomRemote, joinRoomRemote, leaveRoomRemote } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 type View = "home" | "join" | "lobby";
 
+const EMOJIS = ["😎", "🤪", "🤠", "👽", "🤖", "👻"];
 const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
-
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
   animate: { opacity: 1, y: 0, filter: "blur(0px)" },
@@ -38,7 +32,37 @@ export default function GameApp() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [isLeavingRoom, setIsLeavingRoom] = useState(false);
-  const [homeNotice, setHomeNotice] = useState<string | null>(null);
+  
+  // Nouveaux états pour le profil
+  const [pseudo, setPseudo] = useState("");
+  const [avatar, setAvatar] = useState<string>(EMOJIS[0]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fonction pour traiter et redimensionner la photo de l'iPhone
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 150; // On réduit à 150x150 pixels pour que ce soit super léger !
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const min = Math.min(img.width, img.height);
+          const sx = (img.width - min) / 2;
+          const sy = (img.height - min) / 2;
+          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+          setAvatar(canvas.toDataURL("image/jpeg", 0.7)); // Qualité 70%
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleKickedByHost = useCallback(() => {
     setIsLeavingRoom(false);
@@ -50,74 +74,38 @@ export default function GameApp() {
     setPin("");
     setJoinError(null);
     setBusy(false);
-    setHomeNotice("L’hôte a quitté la salle.");
   }, []);
 
-  const {
-    players: remotePlayers,
-    loading: remoteLoading,
-    error: remoteError,
-    realtimeState,
-    lastEventAt,
-  } = useLobbyPlayers(
+  const { players: remotePlayers, loading: remoteLoading } = useLobbyPlayers(
     roomCode,
     Boolean(remote && view === "lobby"),
-    remote
-      ? { isHost, onRoomClosedByHost: handleKickedByHost }
-      : undefined,
+    remote ? { isHost, onRoomClosedByHost: handleKickedByHost } : undefined,
   );
 
   useEffect(() => {
-    if (remote || view !== "lobby" || !roomCode || isHost) return;
-    if (typeof BroadcastChannel === "undefined") return;
-    const bc = new BroadcastChannel(`samedi-lobby-${roomCode}`);
-    bc.onmessage = (ev: MessageEvent) => {
-      if (ev.data?.type === "room_closed") {
-        handleKickedByHost();
-      }
-    };
-    return () => {
-      bc.close();
-    };
-  }, [remote, view, roomCode, isHost, handleKickedByHost]);
-
-  // --- NOUVEAU CODE : Gérer la fermeture de la page / de l'onglet ---
-  useEffect(() => {
     if (!remote || view !== "lobby" || !roomCode || !myPlayerId) return;
-
     const handleBeforeUnload = () => {
       const supabase = getSupabaseBrowser();
       if (supabase) {
-        // Envoie un dernier signal avant que la page ne meure
         supabase.channel(`lobby:${roomCode}`).send({
           type: "broadcast",
           event: isHost ? "room_closed" : "player_left"
         }).catch(() => {});
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [remote, view, roomCode, myPlayerId, isHost]);
-  // ------------------------------------------------------------------
-
-  const pingMs = useSupabasePing(Boolean(remote && view === "lobby"));
 
   const playersRaw = remote ? remotePlayers : localPlayers;
-  const players =
-    isLeavingRoom && myPlayerId
-      ? playersRaw.filter((p) => p.id !== myPlayerId)
-      : playersRaw;
+  const players = isLeavingRoom && myPlayerId ? playersRaw.filter((p) => p.id !== myPlayerId) : playersRaw;
 
   const goHome = useCallback(async () => {
-    setHomeNotice(null);
     setJoinError(null);
     if (roomCode && myPlayerId) {
       setIsLeavingRoom(true);
       if (remote) {
         setBusy(true);
-        
-        // --- NOUVEAU CODE : Envoyer le signal instantané aux autres ---
         const supabase = getSupabaseBrowser();
         if (supabase) {
           await supabase.channel(`lobby:${roomCode}`).send({
@@ -125,15 +113,8 @@ export default function GameApp() {
             event: isHost ? "room_closed" : "player_left"
           }).catch(() => {});
         }
-        // --------------------------------------------------------------
-
-        const left = await leaveRoomRemote(roomCode, myPlayerId, isHost);
+        await leaveRoomRemote(roomCode, myPlayerId, isHost);
         setBusy(false);
-        if (!left.ok) {
-          setIsLeavingRoom(false);
-          setJoinError(left.error);
-          return;
-        }
       } else {
         mockLobbyStore.leaveRoom(roomCode, myPlayerId);
       }
@@ -145,16 +126,13 @@ export default function GameApp() {
     setMyPlayerId(null);
     setIsHost(false);
     setPin("");
-    setJoinError(null);
-    setBusy(false);
   }, [remote, roomCode, myPlayerId, isHost]);
 
   const handleCreate = async () => {
-    setHomeNotice(null);
     setJoinError(null);
     if (remote) {
       setBusy(true);
-      const result = await createRoomRemote();
+      const result = await createRoomRemote(pseudo.trim() || "Anonyme", avatar);
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
@@ -166,7 +144,7 @@ export default function GameApp() {
       }
       return;
     }
-    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom();
+    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom(pseudo.trim(), avatar);
     setRoomCode(code);
     setLocalPlayers(p);
     setMyPlayerId(id);
@@ -174,260 +152,156 @@ export default function GameApp() {
     setView("lobby");
   };
 
-  const handleJoinClick = () => {
-    setHomeNotice(null);
-    setJoinError(null);
-    setPin("");
-    setView("join");
-  };
-
   const handleJoinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (remote) {
       setBusy(true);
-      const result = await joinRoomRemote(pin);
+      const result = await joinRoomRemote(pin, pseudo.trim() || "Anonyme", avatar);
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
         setMyPlayerId(result.myPlayerId);
         setIsHost(false);
         setView("lobby");
-        setJoinError(null);
       } else {
         setJoinError(result.error);
       }
       return;
     }
-    const result = mockLobbyStore.joinRoom(pin);
+    const result = mockLobbyStore.joinRoom(pin, pseudo.trim(), avatar);
     if (result.ok) {
       setRoomCode(result.code);
       setLocalPlayers(result.players);
       setMyPlayerId(result.myPlayerId);
       setIsHost(false);
       setView("lobby");
-      setJoinError(null);
-    } else {
-      setJoinError(result.error);
     }
-  };
-
-  const onPinChange = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 4);
-    setPin(digits);
-    setJoinError(null);
   };
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-[var(--app-bg)] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-violet-400/25 blur-3xl" />
-        <div className="absolute -right-16 bottom-32 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl" />
-      </div>
-
       <header className="relative z-10 mb-8 flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet-600/90">
-            Samedi
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            Parties en ligne
-          </h1>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet-600/90">Samedi</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Parties en ligne</h1>
         </div>
         {view !== "home" && (
-          <motion.button
-            type="button"
-            onClick={() => void goHome()}
-            disabled={busy}
-            className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-soft)] backdrop-blur-sm transition hover:bg-white disabled:opacity-60"
-            whileTap={{ scale: 0.97 }}
-          >
-            {busy ? "…" : "Accueil"}
-          </motion.button>
+          <button onClick={() => void goHome()} disabled={busy} className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-white">
+            Quitter
+          </button>
         )}
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col">
         <AnimatePresence mode="wait">
           {view === "home" && (
-            <motion.section
-              key="home"
-              className="flex flex-1 flex-col justify-center gap-6"
-              {...pageTransition}
-            >
-              <p className="text-center text-sm leading-relaxed text-slate-600">
-                Lance une salle ou rejoins tes amis avec un code à 4 chiffres.
-              </p>
-              {homeNotice && (
-                <p
-                  className="text-center text-sm font-medium text-amber-900"
-                  role="status"
+            <motion.section key="home" className="flex flex-1 flex-col justify-center gap-6" {...pageTransition}>
+              
+              {/* --- SECTION PROFIL --- */}
+              <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
+                <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Ton Profil</h2>
+                
+                {/* L'Avatar cliquable pour ouvrir la caméra */}
+                <div 
+                  className="relative h-24 w-24 rounded-full bg-white flex items-center justify-center text-4xl shadow-md cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  {homeNotice}
-                </p>
-              )}
-              {joinError && (
-                <p
-                  className="text-center text-sm font-medium text-red-600"
-                  role="alert"
-                >
-                  {joinError}
-                </p>
-              )}
+                  {avatar.startsWith("data:image") ? (
+                    <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <span>{avatar}</span>
+                  )}
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
+                    <span className="text-white text-2xl">📷</span>
+                  </div>
+                </div>
+                
+                {/* Input caché pour le fichier */}
+                <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+
+                {/* Choix d'emojis rapides */}
+                <div className="flex gap-3 mt-1">
+                  {EMOJIS.map(e => (
+                    <button key={e} onClick={() => setAvatar(e)} className={`text-2xl transition ${avatar === e ? 'scale-125 drop-shadow-md' : 'opacity-50 hover:opacity-100'}`}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Entre ton pseudo..."
+                  value={pseudo}
+                  onChange={(e) => setPseudo(e.target.value)}
+                  maxLength={15}
+                  className="w-full rounded-2xl border-none bg-white/90 px-4 py-4 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                />
+              </div>
+
+              {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
+              
               <div className="flex flex-col gap-4">
-                <motion.button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={busy}
-                  className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-[var(--shadow-cta)] transition hover:brightness-105 active:brightness-95 disabled:opacity-60"
-                  whileHover={{ scale: busy ? 1 : 1.02 }}
-                  whileTap={{ scale: busy ? 1 : 0.98 }}
-                  transition={spring}
-                >
+                <button onClick={handleCreate} disabled={busy || !pseudo.trim()} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105 disabled:opacity-40">
                   {busy ? "Création…" : "Créer une partie"}
-                </motion.button>
-                <motion.button
-                  type="button"
-                  onClick={handleJoinClick}
-                  disabled={busy}
-                  className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] border border-slate-200/80 bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-[var(--shadow-soft)] backdrop-blur-sm transition hover:bg-white disabled:opacity-60"
-                  whileHover={{ scale: busy ? 1 : 1.02 }}
-                  whileTap={{ scale: busy ? 1 : 0.98 }}
-                  transition={spring}
-                >
+                </button>
+                <button onClick={() => setView("join")} disabled={busy || !pseudo.trim()} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-sm transition hover:bg-white disabled:opacity-40">
                   Rejoindre une partie
-                </motion.button>
+                </button>
               </div>
             </motion.section>
           )}
 
           {view === "join" && (
-            <motion.section
-              key="join"
-              className="flex flex-1 flex-col justify-center"
-              {...pageTransition}
-            >
+            <motion.section key="join" className="flex flex-1 flex-col justify-center" {...pageTransition}>
               <form onSubmit={handleJoinSubmit} className="flex flex-col gap-6">
                 <div>
-                  <label
-                    htmlFor="code"
-                    className="mb-3 block text-center text-sm font-medium text-slate-700"
-                  >
-                    Code à 4 chiffres
-                  </label>
+                  <label className="mb-3 block text-center text-sm font-medium text-slate-700">Code à 4 chiffres</label>
                   <input
-                    id="code"
-                    name="code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="\d{4}"
-                    maxLength={4}
-                    placeholder="• • • •"
-                    value={pin}
-                    onChange={(e) => onPinChange(e.target.value)}
-                    className="w-full rounded-[1.5rem] border border-slate-200/90 bg-white/95 px-6 py-5 text-center font-mono text-3xl tracking-[0.5em] text-slate-900 shadow-[var(--shadow-soft)] outline-none ring-violet-500/30 transition placeholder:text-slate-300 focus:border-violet-400 focus:ring-4"
+                    inputMode="numeric" pattern="\d{4}" maxLength={4} placeholder="• • • •"
+                    value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className="w-full rounded-[1.5rem] border-none bg-white/95 px-6 py-5 text-center font-mono text-3xl tracking-[0.5em] text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-violet-400/50"
                   />
                 </div>
-                {joinError && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center text-sm font-medium text-red-600"
-                    role="alert"
-                  >
-                    {joinError}
-                  </motion.p>
-                )}
-                <motion.button
-                  type="submit"
-                  disabled={pin.length !== 4 || busy}
-                  className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-[var(--shadow-cta)] transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-                  whileTap={
-                    pin.length === 4 && !busy ? { scale: 0.98 } : undefined
-                  }
-                >
+                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
+                <button type="submit" disabled={pin.length !== 4 || busy} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
                   {busy ? "Connexion…" : "Entrer dans la salle"}
-                </motion.button>
+                </button>
+                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
               </form>
             </motion.section>
           )}
 
           {view === "lobby" && roomCode && (
-            <motion.section
-              key="lobby"
-              className="flex flex-1 flex-col"
-              {...pageTransition}
-            >
-              <div className="mb-8 rounded-[2rem] border border-white/60 bg-white/85 p-6 shadow-[var(--shadow-soft)] backdrop-blur-md">
-                <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Code de la salle
-                </p>
-                <motion.p
-                  className="mt-3 text-center font-mono text-4xl font-bold tracking-[0.35em] text-slate-900"
-                  initial={{ scale: 0.92 }}
-                  animate={{ scale: 1 }}
-                  transition={spring}
-                >
-                  {roomCode}
-                </motion.p>
+            <motion.section key="lobby" className="flex flex-1 flex-col" {...pageTransition}>
+              <div className="mb-8 rounded-[2rem] bg-white/85 p-6 shadow-sm backdrop-blur-md">
+                <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500">Code de la salle</p>
+                <p className="mt-3 text-center font-mono text-4xl font-bold tracking-[0.35em] text-slate-900">{roomCode}</p>
               </div>
 
-              <div className="flex flex-1 flex-col rounded-[2rem] border border-slate-100 bg-white/70 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm">
-                <h2 className="mb-4 text-sm font-semibold text-slate-600">
-                  Joueurs dans la salle (
-                  {remoteLoading && players.length === 0 ? "…" : players.length}
-                  )
+              <div className="flex flex-1 flex-col rounded-[2rem] bg-white/70 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="mb-4 text-sm font-bold text-slate-600 uppercase tracking-wide">
+                  Joueurs ({players.length})
                 </h2>
-                {joinError && (
-                  <p
-                    className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
-                    role="alert"
-                  >
-                    {joinError}
-                  </p>
-                )}
-                {remote && remoteError && (
-                  <p className="mb-3 text-sm font-medium text-red-600">
-                    {remoteError}
-                  </p>
-                )}
                 <ul className="flex flex-col gap-3">
-                  <AnimatePresence initial={false}>
+                  <AnimatePresence>
                     {players.map((p, i) => (
-                      <motion.li
-                        key={p.id}
-                        layout
-                        initial={{ opacity: 0, x: -12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 12 }}
-                        transition={{ delay: i * 0.05, ...spring }}
-                        className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm ring-1 ring-slate-100"
-                      >
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-bold text-white shadow-inner">
-                          {p.name.slice(0, 2).toUpperCase()}
+                      <motion.li key={p.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm">
+                        
+                        {/* Affichage de l'avatar des joueurs ! */}
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-100 text-2xl shadow-inner overflow-hidden border-2 border-white">
+                          {p.avatar && p.avatar.startsWith("data:image") ? (
+                            <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span>{p.avatar || "👾"}</span>
+                          )}
                         </span>
-                        <span className="font-medium text-slate-900">
-                          {p.name}
-                        </span>
+                        
+                        <span className="font-bold text-slate-800 text-lg">{p.name}</span>
+                        {p.id === myPlayerId && <span className="ml-auto text-xs font-bold text-violet-500 bg-violet-100 px-2 py-1 rounded-full">MOI</span>}
                       </motion.li>
                     ))}
                   </AnimatePresence>
                 </ul>
-                {remote && (
-                  <NetworkDebugPanel
-                    pingMs={pingMs}
-                    realtimeState={realtimeState}
-                    lastEventAt={lastEventAt}
-                    mode="remote"
-                  />
-                )}
-                {!remote && (
-                  <NetworkDebugPanel
-                    pingMs={null}
-                    realtimeState="idle"
-                    lastEventAt={null}
-                    mode="local"
-                  />
-                )}
               </div>
             </motion.section>
           )}
