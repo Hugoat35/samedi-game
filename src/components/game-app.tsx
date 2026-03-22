@@ -9,6 +9,7 @@ import { createRoomRemote, joinRoomRemote, leaveRoomRemote, startGameRemote } fr
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
+import QuizGame from "@/components/quiz-game";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
@@ -401,16 +402,15 @@ export default function GameApp() {
             </motion.section>
           )}
 
-          {view === "playing" && roomState && (
-            <motion.section key="playing" className="flex flex-1 flex-col justify-center items-center text-center bg-white/80 rounded-[2rem] p-6 shadow-sm backdrop-blur-md" {...pageTransition}>
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">C'est parti ! 🚀</h2>
-              <p className="text-slate-600 font-medium text-lg">Préparez-vous à répondre...</p>
-              
-              <div className="mt-8 p-4 bg-violet-100 rounded-xl">
-                <p className="text-sm font-bold text-violet-800">
-                  {roomState.game_data?.questions?.length} questions ont été tirées au sort !
-                </p>
-              </div>
+          {view === "playing" && roomState && roomCode && myPlayerId && (
+            <motion.section key="playing" className="flex flex-1 flex-col" {...pageTransition}>
+              <QuizGame
+                roomCode={roomCode}
+                roomState={roomState}
+                myPlayerId={myPlayerId}
+                isHost={isHost}
+                players={players}
+              />
             </motion.section>
           )}
 
