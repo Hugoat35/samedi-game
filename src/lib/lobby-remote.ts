@@ -415,6 +415,8 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
 export async function startWordleGameRemote(
   roomCode: string,
   rounds: number,
+  wordLenMin: number,
+  wordLenMax: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
@@ -422,6 +424,8 @@ export async function startWordleGameRemote(
   const { data, error } = await supabase.rpc("wordle_start_game", {
     p_code: roomCode.trim(),
     p_rounds: rounds,
+    p_word_len_min: wordLenMin,
+    p_word_len_max: wordLenMax,
   });
 
   if (error) return { ok: false, error: error.message };

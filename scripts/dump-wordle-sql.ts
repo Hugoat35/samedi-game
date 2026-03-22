@@ -1,4 +1,10 @@
-import { WORDS_FR_5, WORDS_FR_6, WORDS_FR_7 } from "../src/lib/wordle-dict";
+import {
+  WORDS_FR_3,
+  WORDS_FR_4,
+  WORDS_FR_5,
+  WORDS_FR_6,
+  WORDS_FR_7,
+} from "../src/lib/wordle-dict";
 
 function dump(label: string, words: readonly string[]) {
   console.log(`-- ${label}: ${words.length} mots`);
@@ -6,6 +12,8 @@ function dump(label: string, words: readonly string[]) {
   console.log(words.map((w) => `  ('${w}')`).join(",\n") + "\non conflict (word) do nothing;");
 }
 
+dump("3 lettres", WORDS_FR_3);
+dump("4 lettres", WORDS_FR_4);
 dump("5 lettres", WORDS_FR_5);
 dump("6 lettres", WORDS_FR_6);
 dump("7 lettres", WORDS_FR_7);

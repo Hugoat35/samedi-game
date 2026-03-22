@@ -117,7 +117,9 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
   const winPts = Number(w.win_points ?? 200);
   const greenPts = Number(w.green_points ?? 50);
   const yellowPts = Number(w.yellow_points ?? 20);
-  const wordLen = Math.min(7, Math.max(5, Number(w.word_length ?? 5)));
+  const wordLen = Math.min(7, Math.max(3, Number(w.word_length ?? 5)));
+  const lenMin = Math.min(7, Math.max(3, Number(w.word_len_min ?? w.word_length ?? 5)));
+  const lenMax = Math.min(7, Math.max(3, Number(w.word_len_max ?? w.word_length ?? 5)));
 
   const currentTurnId = playerOrder[turnIndex] ?? null;
   const currentTurnPlayer = useMemo(
@@ -259,8 +261,17 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
           )}
         </div>
         <p className="mt-1 text-[10px] leading-snug text-slate-500 sm:text-xs">
-          Mots de {wordLen} lettres · +{winPts} pts si tu trouves le mot · +{greenPts} / lettre verte nouvelle · +
-          {yellowPts} / lettre jaune nouvelle (sur ton tour).
+          {lenMin === lenMax ? (
+            <>
+              Mots de {wordLen} lettres · +{winPts} pts si tu trouves le mot · +{greenPts} / lettre verte nouvelle · +
+              {yellowPts} / lettre jaune nouvelle (sur ton tour).
+            </>
+          ) : (
+            <>
+              Mot actuel : {wordLen} lettres (plage hôte {lenMin}–{lenMax}) · +{winPts} pts si tu trouves le mot · +
+              {greenPts} / lettre verte nouvelle · +{yellowPts} / lettre jaune nouvelle (sur ton tour).
+            </>
+          )}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {players.map((p) => (

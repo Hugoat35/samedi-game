@@ -1,6 +1,7 @@
 /**
- * Listes utilisées pour **générer** les `INSERT` (script `dump-wordle-sql.ts`).
- * La validation en jeu repose sur la table `wordle_dictionary` + RPC `wordle_word_exists`.
+ * Petites listes pour le script `dump-wordle-sql.ts` (migrations de secours).
+ * En production, le dictionnaire principal vient du fichier importé (voir `data/README.txt`,
+ * commande `npm run import-wordlist`) ; la validation en jeu = table `wordle_dictionary` + RPC `wordle_word_exists`.
  */
 const RAW = [
   "AIDER",
@@ -509,13 +510,121 @@ function uniqValidLen(words: readonly string[], len: number): string[] {
   return out;
 }
 
+const RAW3 = [
+  "AIR",
+  "ARC",
+  "BAR",
+  "BAS",
+  "BEC",
+  "BIS",
+  "BOX",
+  "BUT",
+  "CAP",
+  "CAS",
+  "COQ",
+  "CRI",
+  "CUE",
+  "DON",
+  "DUE",
+  "DUR",
+  "DUO",
+  "EAU",
+  "FER",
+  "FEU",
+  "FIL",
+  "FIN",
+  "GEL",
+  "HUE",
+  "IRE",
+  "JEU",
+  "JUS",
+  "LAC",
+  "LAS",
+  "LIT",
+  "LOI",
+  "LUE",
+  "LUX",
+  "MER",
+  "MIE",
+  "NEF",
+  "NID",
+  "NUE",
+  "PIE",
+  "PIN",
+  "POT",
+  "ROI",
+  "RUE",
+  "SEL",
+  "SKI",
+  "TEL",
+  "TIE",
+  "VIE",
+  "VIN",
+  "ZEN",
+] as const;
+
+const RAW4 = [
+  "AIDE",
+  "AIRE",
+  "ANSE",
+  "AUBE",
+  "AUTO",
+  "BANC",
+  "BASE",
+  "BLEU",
+  "BLOC",
+  "BOIS",
+  "BOND",
+  "BORD",
+  "BRAS",
+  "CAGE",
+  "CAFE",
+  "CART",
+  "CASE",
+  "CITE",
+  "COTE",
+  "COUP",
+  "CUBE",
+  "DAME",
+  "DENT",
+  "DUNE",
+  "ECHO",
+  "ELUE",
+  "FACE",
+  "FILM",
+  "FINE",
+  "FOND",
+  "GARE",
+  "GOLF",
+  "HALO",
+  "HOTE",
+  "JADE",
+  "JOUE",
+  "LACE",
+  "LAME",
+  "LION",
+  "LOUE",
+  "LUCE",
+  "LUNE",
+  "MALE",
+  "MINE",
+  "NAGE",
+  "NICE",
+  "NORD",
+  "NOTE",
+  "ORAL",
+  "PALE",
+  "PAVE",
+  "PORT",
+  "RAGE",
+  "SAUT",
+  "TUBE",
+  "VENT",
+  "ZONE",
+] as const;
+
+export const WORDS_FR_3: readonly string[] = uniqValidLen(RAW3, 3);
+export const WORDS_FR_4: readonly string[] = uniqValidLen(RAW4, 4);
 export const WORDS_FR_5: readonly string[] = uniqValidLen(RAW, 5);
 export const WORDS_FR_6: readonly string[] = uniqValidLen(RAW6, 6);
 export const WORDS_FR_7: readonly string[] = uniqValidLen(RAW7, 7);
-
-/** Longueur du mot selon le nombre de joueurs (aligné sur `wordle_start_game` en base). */
-export function wordLengthForPlayerCount(n: number): 5 | 6 | 7 {
-  if (n <= 3) return 5;
-  if (n <= 5) return 6;
-  return 7;
-}

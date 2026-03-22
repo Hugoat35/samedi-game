@@ -39,6 +39,9 @@ function selectedGameFromRoom(room: Record<string, unknown>): string {
   return gk === "wordle" ? "wordle-team" : "culture-quiz";
 }
 
+const WORDLE_LEN_LO = 3;
+const WORDLE_LEN_HI = 7;
+
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
   animate: { opacity: 1, y: 0, filter: "blur(0px)" },
@@ -65,6 +68,10 @@ export default function GameApp() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(5);
   const [wordleRounds, setWordleRounds] = useState(5);
+  const WORDLE_LEN_LO = 3;
+  const WORDLE_LEN_HI = 7;
+  const [wordleLenMin, setWordleLenMin] = useState(5);
+  const [wordleLenMax, setWordleLenMax] = useState(7);
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(() => remote);
   const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
@@ -374,7 +381,7 @@ export default function GameApp() {
       setBusy(true);
       const result =
         selectedGame === "wordle-team"
-          ? await startWordleGameRemote(roomCode, wordleRounds)
+          ? await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax)
           : await startGameRemote(roomCode, questionCount);
       setBusy(false);
 
@@ -728,6 +735,60 @@ export default function GameApp() {
                               Un mot secret caché pour tous : mêmes indices, tour à tour. Ordre mélangé à chaque
                               manche.
                             </p>
+                            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 sm:px-4">
+                              <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-800 sm:text-xs">
+                                Longueur des mots ({WORDLE_LEN_LO}–{WORDLE_LEN_HI} lettres)
+                              </p>
+                              <div className="relative mb-2 h-9">
+                                <div
+                                  className="pointer-events-none absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200"
+                                  aria-hidden
+                                />
+                                <div
+                                  className="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-500"
+                                  style={{
+                                    left: `${((wordleLenMin - WORDLE_LEN_LO) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
+                                    width: `${((wordleLenMax - wordleLenMin) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
+                                  }}
+                                  aria-hidden
+                                />
+                                <input
+                                  type="range"
+                                  min={WORDLE_LEN_LO}
+                                  max={WORDLE_LEN_HI}
+                                  value={wordleLenMin}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setWordleLenMin(Math.min(v, wordleLenMax));
+                                  }}
+                                  className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-emerald-600"
+                                  style={{ zIndex: wordleLenMin >= wordleLenMax ? 5 : 3 }}
+                                  aria-label="Longueur minimale des mots"
+                                />
+                                <input
+                                  type="range"
+                                  min={WORDLE_LEN_LO}
+                                  max={WORDLE_LEN_HI}
+                                  value={wordleLenMax}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    setWordleLenMax(Math.max(v, wordleLenMin));
+                                  }}
+                                  className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-teal-600"
+                                  style={{ zIndex: wordleLenMax <= wordleLenMin ? 5 : 4 }}
+                                  aria-label="Longueur maximale des mots"
+                                />
+                              </div>
+                              <div className="flex justify-between gap-2 text-[10px] font-semibold text-slate-600 sm:text-xs">
+                                <span>Min : {wordleLenMin}</span>
+                                <span className="text-center text-emerald-700">
+                                  {wordleLenMin === wordleLenMax
+                                    ? `Fixé à ${wordleLenMin} lettre${wordleLenMin > 1 ? "s" : ""}`
+                                    : `De ${wordleLenMin} à ${wordleLenMax} lettres`}
+                                </span>
+                                <span>Max : {wordleLenMax}</span>
+                              </div>
+                            </div>
                             <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                               <span className="font-semibold text-slate-600">Manches</span>
                               <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums sm:text-xl">

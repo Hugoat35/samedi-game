@@ -34,6 +34,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# Liste massive de mots (tu la places localement, voir data/README.txt)
+/data/*.txt
+/data/*.dic
+/data/*.csv
+!/data/README.txt
+
 # env files (can opt-in for committing if needed)
 .env*
 
