@@ -13,6 +13,7 @@ import {
   leaveRoomRemote,
   reconnectPlayerRemote,
   startGameRemote,
+  startWordleGameRemote,
 } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import {
@@ -29,8 +30,14 @@ import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 // IMPORT DU NOUVEAU JEU !
 import QuizGame from "@/components/quiz-game";
+import WordleGame from "@/components/wordle-game";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
+
+function selectedGameFromRoom(room: Record<string, unknown>): string {
+  const gk = (room.game_data as { game_kind?: string } | undefined)?.game_kind;
+  return gk === "wordle" ? "wordle-team" : "culture-quiz";
+}
 
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
@@ -57,6 +64,7 @@ export default function GameApp() {
   
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(5);
+  const [wordleRounds, setWordleRounds] = useState(5);
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(() => remote);
   const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
@@ -148,7 +156,7 @@ export default function GameApp() {
             setIsHost(session.isHost);
             setPseudo(session.displayName);
             setAvatar(session.avatar);
-            setSelectedGame("culture-quiz");
+            setSelectedGame(selectedGameFromRoom(room));
             await refreshRoomStateRef.current(session.roomCode);
             if (cancelled) return;
             setView(gameState === "playing" ? "playing" : "lobby");
@@ -171,7 +179,7 @@ export default function GameApp() {
               setIsHost(session.isHost);
               setPseudo(session.displayName);
               setAvatar(session.avatar);
-              setSelectedGame("culture-quiz");
+              setSelectedGame(selectedGameFromRoom(room));
               await refreshRoomStateRef.current(session.roomCode);
               setView("playing");
               setSessionRestoring(false);
@@ -364,7 +372,10 @@ export default function GameApp() {
     if (!roomCode) return;
     if (remote) {
       setBusy(true);
-      const result = await startGameRemote(roomCode, questionCount);
+      const result =
+        selectedGame === "wordle-team"
+          ? await startWordleGameRemote(roomCode, wordleRounds)
+          : await startGameRemote(roomCode, questionCount);
       setBusy(false);
 
       if (!result.ok) {
@@ -402,7 +413,8 @@ export default function GameApp() {
     setIsHost(offer.isHost);
     setPseudo(offer.displayName);
     setAvatar(offer.avatar);
-    setSelectedGame("culture-quiz");
+    const roomCheck = await fetchRoomByCode(offer.roomCode);
+    setSelectedGame(roomCheck.ok ? selectedGameFromRoom(roomCheck.room) : "culture-quiz");
     await refreshRoomState(offer.roomCode);
     setView("playing");
   }, [reconnectOffer, remote, refreshRoomState]);
@@ -683,11 +695,24 @@ export default function GameApp() {
                             <span className="shrink-0 text-xs font-bold text-violet-500 sm:text-sm">→</span>
                           </div>
                         </button>
+                        <button
+                          onClick={() => setSelectedGame("wordle-team")}
+                          className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 p-[1.5px] shadow-sm transition hover:brightness-[1.02] sm:rounded-2xl sm:p-[2px]"
+                        >
+                          <div className="flex w-full items-center justify-between gap-2 rounded-[11px] bg-white px-3 py-3 sm:rounded-[14px] sm:px-5 sm:py-3.5">
+                            <span className="min-w-0 truncate text-left text-sm font-bold text-slate-800 sm:text-base">
+                              🔤 Wordle à plusieurs
+                            </span>
+                            <span className="shrink-0 text-xs font-bold text-emerald-600 sm:text-sm">→</span>
+                          </div>
+                        </button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3 sm:gap-4">
                         <div className="flex items-center justify-between gap-2">
-                          <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base">🧠 Culture Quiz</h3>
+                          <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base">
+                            {selectedGame === "wordle-team" ? "🔤 Wordle à plusieurs" : "🧠 Culture Quiz"}
+                          </h3>
                           <button
                             type="button"
                             onClick={() => setSelectedGame(null)}
@@ -697,19 +722,47 @@ export default function GameApp() {
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                          <span className="font-semibold text-slate-600">Questions</span>
-                          <span className="font-mono text-lg font-bold text-violet-600 tabular-nums sm:text-xl">{questionCount}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="3"
-                          max="50"
-                          step="1"
-                          value={questionCount}
-                          onChange={(e) => setQuestionCount(Number(e.target.value))}
-                          className="mb-1 w-full accent-violet-600"
-                        />
+                        {selectedGame === "wordle-team" ? (
+                          <>
+                            <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
+                              Un mot secret caché pour tous : mêmes indices, tour à tour. Ordre mélangé à chaque
+                              manche.
+                            </p>
+                            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                              <span className="font-semibold text-slate-600">Manches</span>
+                              <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums sm:text-xl">
+                                {wordleRounds}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="1"
+                              max="15"
+                              step="1"
+                              value={wordleRounds}
+                              onChange={(e) => setWordleRounds(Number(e.target.value))}
+                              className="mb-1 w-full accent-emerald-600"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                              <span className="font-semibold text-slate-600">Questions</span>
+                              <span className="font-mono text-lg font-bold text-violet-600 tabular-nums sm:text-xl">
+                                {questionCount}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="3"
+                              max="50"
+                              step="1"
+                              value={questionCount}
+                              onChange={(e) => setQuestionCount(Number(e.target.value))}
+                              className="mb-1 w-full accent-violet-600"
+                            />
+                          </>
+                        )}
 
                         {startError && (
                           <p className="rounded-lg border border-red-100 bg-red-50 p-2 text-center text-xs font-bold text-red-500 sm:p-3 sm:text-sm">
@@ -747,13 +800,23 @@ export default function GameApp() {
                   {playerDepartedNotice}
                 </div>
               )}
-              <QuizGame
-                roomCode={roomCode}
-                roomState={roomState}
-                myPlayerId={myPlayerId}
-                isHost={isHost}
-                players={players}
-              />
+              {(roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wordle" ? (
+                <WordleGame
+                  roomCode={roomCode}
+                  roomState={roomState}
+                  myPlayerId={myPlayerId}
+                  isHost={isHost}
+                  players={players}
+                />
+              ) : (
+                <QuizGame
+                  roomCode={roomCode}
+                  roomState={roomState}
+                  myPlayerId={myPlayerId}
+                  isHost={isHost}
+                  players={players}
+                />
+              )}
             </motion.section>
           )}
 

@@ -412,6 +412,44 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
   return { ok: true };
 }
 
+export async function startWordleGameRemote(
+  roomCode: string,
+  rounds: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const { data, error } = await supabase.rpc("wordle_start_game", {
+    p_code: roomCode.trim(),
+    p_rounds: rounds,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  const o = data as { ok?: boolean; error?: string };
+  if (!o?.ok) return { ok: false, error: (o?.error as string) ?? "Réponse serveur invalide." };
+  return { ok: true };
+}
+
+export async function submitWordleGuessRemote(
+  roomCode: string,
+  playerId: string,
+  guess: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const { data, error } = await supabase.rpc("wordle_submit_guess", {
+    p_code: roomCode.trim(),
+    p_player_id: playerId,
+    p_guess: guess.trim().toUpperCase(),
+  });
+
+  if (error) return { ok: false, error: error.message };
+  const o = data as { ok?: boolean; error?: string };
+  if (!o?.ok) return { ok: false, error: (o?.error as string) ?? "Réponse serveur invalide." };
+  return { ok: true };
+}
+
 export async function nextQuestionRemote(
   roomCode: string,
   nextIndex: number,
