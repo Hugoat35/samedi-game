@@ -72,24 +72,29 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const [timeLeft, setTimeLeft] = useState(15);
   const [revealTimeLeft, setRevealTimeLeft] = useState(REVEAL_DURATION);
   const [phase, setPhase] = useState<"question" | "reveal">("question");
+  /** Choix QCM / Vrai-Faux appliqué tout de suite au clic (avant Supabase). */
+  const [localAnswer, setLocalAnswer] = useState<string | null>(null);
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [minibacValues, setMinibacValues] = useState(["", "", "", ""]);
 
   useEffect(() => {
-    if (gameState !== "playing" || !currentQuestion) return;
+    if (!currentQuestion?.id) return;
     setPhase("question");
     setTimeLeft(GET_DURATION(currentQuestion.type));
     setRevealTimeLeft(REVEAL_DURATION);
     setInputValue("");
     setMinibacValues(["", "", "", ""]);
     setLocalSubmitted(false);
-  }, [currentQuestion?.id, gameState]);
+    setLocalAnswer(null);
+  }, [currentQuestion?.id]);
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount > 0 && answeredCount >= players.length;
   const myAnswer = answers[myPlayerId] ?? null;
-  const hasLockedAnswer = localSubmitted || myAnswer !== null;
+  /** Réponse affichée pour les boutons : locale d’abord, puis synchro serveur. */
+  const effectiveChoice = localAnswer ?? myAnswer;
+  const hasLockedAnswer = localSubmitted || myAnswer !== null || localAnswer !== null;
 
   useEffect(() => {
     if (allAnswered && phase === "question" && gameState === "playing") {
@@ -203,15 +208,15 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const handleAnswerClick = async (answer: string | number) => {
     const answerStr = String(answer).trim();
     if (!currentQuestion) return;
-    if (hasLockedAnswer || phase !== "question" || !answerStr) return;
+    if (localAnswer !== null || myAnswer !== null || phase !== "question" || !answerStr) return;
 
-    setLocalSubmitted(true);
+    setLocalAnswer(answerStr);
     const res = await submitAnswerRemote(roomCode, myPlayerId, {
       questionId: currentQuestion.id,
       questionType: currentQuestion.type,
       answerStr,
     });
-    if (!res.ok) setLocalSubmitted(false);
+    if (!res.ok) setLocalAnswer(null);
   };
 
   const handleTextSubmit = async () => {
@@ -666,7 +671,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                     <p className="text-sm font-bold text-slate-500">
                       Ton choix :{" "}
                       <span className={myPoints > 0 ? "text-green-500" : "text-red-500"}>
-                        {myAnswer || "Rien"}
+                        {effectiveChoice || "Rien"}
                       </span>
                     </p>
                     {myPoints > 0 && (
@@ -679,7 +684,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           </div>
         ) : (
           currentQuestion.options?.map((option, i) => {
-            const isSelected = myAnswer === option;
+            const isSelected = effectiveChoice === option;
             let revealClass = "bg-white text-slate-700 border-slate-100/50";
 
             if (phase === "reveal") {
@@ -694,14 +699,16 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                 "bg-violet-600 text-white shadow-violet-500/50 ring-4 ring-violet-200 border-violet-500";
             }
 
+            const choiceLocked = localAnswer !== null || myAnswer !== null;
+
             return (
               <motion.button
                 key={i}
                 type="button"
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleAnswerClick(option)}
-                disabled={hasLockedAnswer || phase !== "question"}
-                className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${!hasLockedAnswer && phase === "question" ? "hover:shadow-md cursor-pointer" : "cursor-default"}`}
+                disabled={choiceLocked || phase !== "question"}
+                className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${!choiceLocked && phase === "question" ? "hover:shadow-md cursor-pointer" : "cursor-default"}`}
               >
                 {option}
                 {phase === "reveal" && option === currentQuestion.answer && myPoints > 0 && (
