@@ -50,9 +50,16 @@ export default function GameApp() {
   const players = remote ? remotePlayers : localPlayers;
 
   const goHome = useCallback(async () => {
+    setJoinError(null);
     if (roomCode && myPlayerId) {
       if (remote) {
-        await leaveRoomRemote(roomCode, myPlayerId, isHost);
+        setBusy(true);
+        const left = await leaveRoomRemote(roomCode, myPlayerId, isHost);
+        setBusy(false);
+        if (!left.ok) {
+          setJoinError(left.error);
+          return;
+        }
       } else {
         mockLobbyStore.leaveRoom(roomCode, myPlayerId);
       }
@@ -152,11 +159,12 @@ export default function GameApp() {
         {view !== "home" && (
           <motion.button
             type="button"
-            onClick={goHome}
-            className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-soft)] backdrop-blur-sm transition hover:bg-white"
+            onClick={() => void goHome()}
+            disabled={busy}
+            className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-soft)] backdrop-blur-sm transition hover:bg-white disabled:opacity-60"
             whileTap={{ scale: 0.97 }}
           >
-            Accueil
+            {busy ? "…" : "Accueil"}
           </motion.button>
         )}
       </header>
@@ -284,6 +292,14 @@ export default function GameApp() {
                   {remoteLoading && players.length === 0 ? "…" : players.length}
                   )
                 </h2>
+                {joinError && (
+                  <p
+                    className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+                    role="alert"
+                  >
+                    {joinError}
+                  </p>
+                )}
                 {remote && remoteError && (
                   <p className="mb-3 text-sm font-medium text-red-600">
                     {remoteError}

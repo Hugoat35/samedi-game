@@ -132,17 +132,47 @@ export async function leaveRoomRemote(
   const code = roomCode.trim();
 
   if (isHost) {
-    const { error } = await supabase.from("rooms").delete().eq("code", code);
-    if (error) return { ok: false, error: error.message };
+    const { data, error } = await supabase
+      .from("rooms")
+      .delete()
+      .eq("code", code)
+      .select("code");
+
+    if (error) {
+      return {
+        ok: false,
+        error: `${error.message} (code: ${error.code ?? "?"})`,
+      };
+    }
+    if (!data?.length) {
+      return {
+        ok: false,
+        error:
+          "La salle n’a pas pu être supprimée (0 ligne). Vérifie les politiques RLS « DELETE » sur la table rooms dans Supabase, ou que le code de salle est correct.",
+      };
+    }
     return { ok: true };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("lobby_players")
     .delete()
-    .eq("id", myPlayerId);
+    .eq("id", myPlayerId)
+    .select("id");
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return {
+      ok: false,
+      error: `${error.message} (code: ${error.code ?? "?"})`,
+    };
+  }
+  if (!data?.length) {
+    return {
+      ok: false,
+      error:
+        "Ton joueur n’a pas été retiré (0 ligne supprimée). Vérifie la politique RLS « DELETE » sur lobby_players.",
+    };
+  }
   return { ok: true };
 }
 
