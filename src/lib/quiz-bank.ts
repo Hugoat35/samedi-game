@@ -237,52 +237,21 @@ export const QUIZ_BANK: QuizQuestion[] = [
   ...GEO_SHAPE_QUESTIONS,
 ];
 
+/** Mélange équitable (Fisher–Yates) : chaque permutation a la même probabilité. */
 function shuffle<T>(arr: T[]): T[] {
-  return [...arr].sort(() => Math.random() - 0.5);
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
 }
 
 // --- GÉNÉRATEUR DYNAMIQUE DE QUESTIONS ---
+/** Tirage uniforme sans remise : chaque entrée de la banque a la même probabilité (géo ou non). */
 export function getRandomQuestions(count: number): QuizQuestion[] {
-  const geoFlags = QUIZ_BANK.filter((q) => q.type === "geo_flag");
-  const geoShapes = QUIZ_BANK.filter((q) => q.type === "geo_shape");
-  const nonGeo = QUIZ_BANK.filter(
-    (q) => q.type !== "geo_flag" && q.type !== "geo_shape",
-  );
-
-  /** Au moins 1 drapeau dès 3 questions ; plus de drapeaux quand la partie s’allonge */
-  let wantFlags =
-    count >= 3
-      ? Math.min(Math.max(1, Math.floor(count / 4)), 8, geoFlags.length, count)
-      : 0;
-
-  let wantShapes = 0;
-  if (count >= 6) {
-    wantShapes = Math.min(1, geoShapes.length, count - wantFlags);
-  }
-  if (count >= 14) {
-    wantShapes = Math.min(2, geoShapes.length, count - wantFlags);
-  }
-  if (count >= 22) {
-    wantShapes = Math.min(3, geoShapes.length, count - wantFlags);
-  }
-
-  while (wantFlags + wantShapes > count) {
-    if (wantShapes > 0) wantShapes--;
-    else wantFlags--;
-  }
-
-  const pickedFlags = shuffle(geoFlags).slice(0, wantFlags);
-  const pickedShapes = shuffle(geoShapes).slice(0, wantShapes);
-  const need = Math.max(0, count - pickedFlags.length - pickedShapes.length);
-  const pickedRest = shuffle(nonGeo).slice(0, need);
-
-  let selected = shuffle([...pickedFlags, ...pickedShapes, ...pickedRest]);
-
-  if (selected.length < count) {
-    const ids = new Set(selected.map((q) => q.id));
-    const extra = shuffle(nonGeo).filter((q) => !ids.has(q.id));
-    selected = [...selected, ...extra].slice(0, count);
-  }
+  const shuffled = shuffle([...QUIZ_BANK]);
+  let selected = shuffled.slice(0, Math.min(count, QUIZ_BANK.length));
 
   // 2. LA MAGIE DU MINI-BAC
   if (count >= 5) {

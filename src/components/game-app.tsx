@@ -460,7 +460,7 @@ export default function GameApp() {
                         <input
                           type="range"
                           min="3"
-                          max="15"
+                          max="50"
                           step="1"
                           value={questionCount}
                           onChange={(e) => setQuestionCount(Number(e.target.value))}

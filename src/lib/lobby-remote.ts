@@ -161,8 +161,8 @@ export type MinibacHistoryEntry = {
   submissions: Record<string, MinibacSubmission>;
 };
 
-/** Met à jour vite `game_data.answers` (+ `minibac_history` si Mini-Bac). */
-export async function submitAnswerRemote(
+/** Ancienne voie lecture → fusion → écriture (course possible si deux clics simultanés). */
+async function submitAnswerRemoteLegacy(
   roomCode: string,
   playerId: string,
   payload: {
@@ -237,6 +237,68 @@ export async function submitAnswerRemote(
     .eq("code", roomCode.trim());
 
   if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}
+
+function shouldFallbackToLegacyRpc(rpcError: { message?: string; code?: string } | null): boolean {
+  if (!rpcError) return false;
+  const msg = (rpcError.message ?? "").toLowerCase();
+  if (rpcError.code === "PGRST202") return true;
+  if (msg.includes("merge_room_answer")) return true;
+  if (msg.includes("function") && msg.includes("does not exist")) return true;
+  return false;
+}
+
+/**
+ * Met à jour `game_data.answers` (+ `minibac_history` si Mini-Bac).
+ * Utilise la RPC Postgres `merge_room_answer` (migration 006) pour une fusion atomique
+ * et éviter qu’une seule réponse survive si plusieurs joueurs valident en même temps.
+ */
+export async function submitAnswerRemote(
+  roomCode: string,
+  playerId: string,
+  payload: {
+    questionId: string;
+    questionType: string;
+    answerStr: string;
+    minibac?: MinibacSubmission;
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const answerStrStored =
+    payload.questionType === "minibac" && payload.minibac
+      ? JSON.stringify({
+          type: "minibac",
+          letter: payload.minibac.letter,
+          categories: payload.minibac.categories,
+          values: payload.minibac.values,
+        })
+      : payload.answerStr;
+
+  const minibacJson =
+    payload.questionType === "minibac" && payload.minibac
+      ? (payload.minibac as unknown as Record<string, unknown>)
+      : null;
+
+  const { error: rpcError } = await supabase.rpc("merge_room_answer", {
+    p_code: roomCode.trim(),
+    p_player_id: playerId,
+    p_question_id: payload.questionId,
+    p_question_type: payload.questionType,
+    p_answer_str: answerStrStored,
+    p_minibac: minibacJson,
+  });
+
+  if (rpcError && shouldFallbackToLegacyRpc(rpcError)) {
+    return submitAnswerRemoteLegacy(roomCode, playerId, payload);
+  }
+
+  if (rpcError) {
+    return { ok: false, error: rpcError.message };
+  }
+
   return { ok: true };
 }
 
