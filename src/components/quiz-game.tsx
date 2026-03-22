@@ -38,6 +38,8 @@ const GET_DURATION = (type: string) => {
 };
 
 const REVEAL_DURATION = 6;
+/** Dès qu’un joueur a validé son Mini-Bac, le temps restant pour tout le monde est plafonné à 10 s. */
+const MINIBAC_RUSH_SECONDS = 10;
 
 function PlayerFace({
   player,
@@ -116,6 +118,13 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   }, [currentQuestion?.id]);
 
   const answeredCount = Object.keys(answers).length;
+
+  useEffect(() => {
+    if (currentQuestion?.type !== "minibac") return;
+    if (phase !== "question") return;
+    if (answeredCount < 1) return;
+    setTimeLeft((t) => Math.min(t, MINIBAC_RUSH_SECONDS));
+  }, [currentQuestion?.type, currentQuestion?.id, phase, answeredCount]);
   const allAnswered = answeredCount > 0 && answeredCount >= players.length;
   const myAnswer = answers[myPlayerId] ?? null;
   /** Réponse affichée pour les boutons : locale d’abord, puis synchro serveur. */

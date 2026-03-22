@@ -237,11 +237,22 @@ export const QUIZ_BANK: QuizQuestion[] = [
   ...GEO_SHAPE_QUESTIONS,
 ];
 
+/** Entier uniforme dans [0, n) — préfère crypto pour un tirage moins prévisible. */
+function randomIntBelow(n: number): number {
+  if (n <= 0) return 0;
+  if (typeof globalThis.crypto !== "undefined" && globalThis.crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(buf);
+    return buf[0]! % n;
+  }
+  return Math.floor(Math.random() * n);
+}
+
 /** Mélange équitable (Fisher–Yates) : chaque permutation a la même probabilité. */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomIntBelow(i + 1);
     [a[i], a[j]] = [a[j]!, a[i]!];
   }
   return a;
@@ -253,16 +264,16 @@ export function getRandomQuestions(count: number): QuizQuestion[] {
   const shuffled = shuffle([...QUIZ_BANK]);
   let selected = shuffled.slice(0, Math.min(count, QUIZ_BANK.length));
 
-  // 2. LA MAGIE DU MINI-BAC
-  if (count >= 5) {
+  // 2. LA MAGIE DU MINI-BAC (indices basés sur la taille réelle du lot tiré)
+  if (count >= 5 && selected.length >= 5) {
     const numMiniBacs = count >= 15 ? 2 : 1;
 
     for (let i = 0; i < numMiniBacs; i++) {
-      const randomLetter = MINI_BAC_LETTERS[Math.floor(Math.random() * MINI_BAC_LETTERS.length)];
+      const randomLetter = MINI_BAC_LETTERS[randomIntBelow(MINI_BAC_LETTERS.length)]!;
       const shuffledCategories = shuffle([...MINI_BAC_CATEGORIES]).slice(0, 4);
 
       const miniBacQuestion: QuizQuestion = {
-        id: `minibac-${Date.now()}-${i}`,
+        id: `minibac-${Date.now()}-${i}-${randomIntBelow(1_000_000_000)}`,
         type: "minibac",
         question: `Mini-Bac : Lettre ${randomLetter}`,
         answer: "vote",
@@ -271,7 +282,7 @@ export function getRandomQuestions(count: number): QuizQuestion[] {
         categories: shuffledCategories,
       };
 
-      const replaceIndex = Math.floor(count * 0.6) + i;
+      const replaceIndex = Math.floor(selected.length * 0.6) + i;
       if (replaceIndex < selected.length) {
         selected[replaceIndex] = miniBacQuestion;
       }
