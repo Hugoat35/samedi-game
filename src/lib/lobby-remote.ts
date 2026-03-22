@@ -168,3 +168,39 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+export async function nextQuestionRemote(roomCode: string, nextIndex: number) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false };
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({ current_question_index: nextIndex })
+    .eq("code", roomCode);
+
+  return { ok: !error };
+}
+
+export async function endGameRemote(roomCode: string) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false };
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({ game_state: "finished" })
+    .eq("code", roomCode);
+
+  return { ok: !error };
+}
+
+export async function returnToLobbyRemote(roomCode: string) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false };
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({ game_state: "lobby" })
+    .eq("code", roomCode);
+
+  return { ok: !error };
+}
