@@ -25,18 +25,19 @@ function generateUniqueCode(): string {
 }
 
 export const mockLobbyStore = {
-  createRoom(): { code: string; players: Player[] } {
+  createRoom(): { code: string; players: Player[]; myPlayerId: string } {
     const code = generateUniqueCode();
+    const hostId = randomId();
     const room: Room = {
       code,
-      players: [{ id: randomId(), name: "Hôte" }],
+      players: [{ id: hostId, name: "Hôte" }],
     };
     rooms.set(code, room);
-    return { code, players: [...room.players] };
+    return { code, players: [...room.players], myPlayerId: hostId };
   },
 
   joinRoom(codeInput: string):
-    | { ok: true; code: string; players: Player[] }
+    | { ok: true; code: string; players: Player[]; myPlayerId: string }
     | { ok: false; error: string } {
     const code = codeInput.trim();
     if (!/^\d{4}$/.test(code)) {
@@ -46,12 +47,25 @@ export const mockLobbyStore = {
     if (!room) {
       return { ok: false, error: "Aucune salle ne correspond à ce code." };
     }
-    const nextIndex = room.players.length;
+    const nextNum = room.players.length + 1;
+    const id = randomId();
     room.players.push({
-      id: randomId(),
-      name: `Joueur ${nextIndex}`,
+      id,
+      name: `Joueur ${nextNum}`,
     });
-    return { ok: true, code, players: [...room.players] };
+    return { ok: true, code, players: [...room.players], myPlayerId: id };
+  },
+
+  leaveRoom(roomCode: string, playerId: string): void {
+    const room = rooms.get(roomCode.trim());
+    if (!room) return;
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p) return;
+    if (p.name === "Hôte") {
+      rooms.delete(room.code);
+      return;
+    }
+    room.players = room.players.filter((x) => x.id !== playerId);
   },
 
   getRoom(code: string): Room | undefined {

@@ -9,6 +9,7 @@ import NetworkDebugPanel from "@/components/network-debug-panel";
 import {
   createRoomRemote,
   joinRoomRemote,
+  leaveRoomRemote,
 } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
@@ -33,6 +34,8 @@ export default function GameApp() {
   const [pin, setPin] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
 
   const {
     players: remotePlayers,
@@ -46,14 +49,23 @@ export default function GameApp() {
 
   const players = remote ? remotePlayers : localPlayers;
 
-  const goHome = useCallback(() => {
+  const goHome = useCallback(async () => {
+    if (roomCode && myPlayerId) {
+      if (remote) {
+        await leaveRoomRemote(roomCode, myPlayerId, isHost);
+      } else {
+        mockLobbyStore.leaveRoom(roomCode, myPlayerId);
+      }
+    }
     setView("home");
     setRoomCode(null);
     setLocalPlayers([]);
+    setMyPlayerId(null);
+    setIsHost(false);
     setPin("");
     setJoinError(null);
     setBusy(false);
-  }, []);
+  }, [remote, roomCode, myPlayerId, isHost]);
 
   const handleCreate = async () => {
     setJoinError(null);
@@ -63,15 +75,19 @@ export default function GameApp() {
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
+        setMyPlayerId(result.myPlayerId);
+        setIsHost(true);
         setView("lobby");
       } else {
         setJoinError(result.error);
       }
       return;
     }
-    const { code, players: p } = mockLobbyStore.createRoom();
+    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom();
     setRoomCode(code);
     setLocalPlayers(p);
+    setMyPlayerId(id);
+    setIsHost(true);
     setView("lobby");
   };
 
@@ -89,6 +105,8 @@ export default function GameApp() {
       setBusy(false);
       if (result.ok) {
         setRoomCode(result.code);
+        setMyPlayerId(result.myPlayerId);
+        setIsHost(false);
         setView("lobby");
         setJoinError(null);
       } else {
@@ -100,6 +118,8 @@ export default function GameApp() {
     if (result.ok) {
       setRoomCode(result.code);
       setLocalPlayers(result.players);
+      setMyPlayerId(result.myPlayerId);
+      setIsHost(false);
       setView("lobby");
       setJoinError(null);
     } else {

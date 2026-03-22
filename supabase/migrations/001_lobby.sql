@@ -31,5 +31,11 @@ create policy "lobby_players_read" on public.lobby_players for select using (tru
 drop policy if exists "lobby_players_insert" on public.lobby_players;
 create policy "lobby_players_insert" on public.lobby_players for insert with check (true);
 
+drop policy if exists "rooms_delete" on public.rooms;
+create policy "rooms_delete" on public.rooms for delete using (true);
+
+drop policy if exists "lobby_players_delete" on public.lobby_players;
+create policy "lobby_players_delete" on public.lobby_players for delete using (true);
+
 -- Temps réel : liste des joueurs synchronisée entre appareils
 alter publication supabase_realtime add table public.lobby_players;

@@ -10,7 +10,7 @@ function randomCode(): string {
 }
 
 export async function createRoomRemote(): Promise<
-  | { ok: true; code: string; players: Player[] }
+  | { ok: true; code: string; players: Player[]; myPlayerId: string }
   | { ok: false; error: string }
 > {
   const supabase = getSupabaseBrowser();
@@ -41,6 +41,7 @@ export async function createRoomRemote(): Promise<
     return {
       ok: true,
       code,
+      myPlayerId: inserted.id,
       players: [
         { id: inserted.id, name: inserted.display_name ?? "Hôte" },
       ],
@@ -53,7 +54,7 @@ export async function createRoomRemote(): Promise<
 export async function joinRoomRemote(
   codeInput: string,
 ): Promise<
-  | { ok: true; code: string; players: Player[] }
+  | { ok: true; code: string; players: Player[]; myPlayerId: string }
   | { ok: false; error: string }
 > {
   const supabase = getSupabaseBrowser();
@@ -87,12 +88,17 @@ export async function joinRoomRemote(
   const nextNum = (count ?? 0) + 1;
   const displayName = `Joueur ${nextNum}`;
 
-  const { error: insErr } = await supabase.from("lobby_players").insert({
-    room_code: code,
-    display_name: displayName,
-  });
+  const { data: newRow, error: insErr } = await supabase
+    .from("lobby_players")
+    .insert({
+      room_code: code,
+      display_name: displayName,
+    })
+    .select("id")
+    .single();
 
   if (insErr) return { ok: false, error: insErr.message };
+  if (!newRow) return { ok: false, error: "Joueur non créé." };
 
   const { data: rows, error: listErr } = await supabase
     .from("lobby_players")
@@ -105,11 +111,39 @@ export async function joinRoomRemote(
   return {
     ok: true,
     code,
+    myPlayerId: newRow.id,
     players: (rows ?? []).map((r) => ({
       id: r.id,
       name: r.display_name ?? "?",
     })),
   };
+}
+
+export async function leaveRoomRemote(
+  roomCode: string,
+  myPlayerId: string,
+  isHost: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) {
+    return { ok: false, error: "Supabase non configuré." };
+  }
+
+  const code = roomCode.trim();
+
+  if (isHost) {
+    const { error } = await supabase.from("rooms").delete().eq("code", code);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
+
+  const { error } = await supabase
+    .from("lobby_players")
+    .delete()
+    .eq("id", myPlayerId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function fetchPlayersRemote(roomCode: string): Promise<
