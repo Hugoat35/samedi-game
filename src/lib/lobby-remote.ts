@@ -335,8 +335,15 @@ export async function endGameRemote(
   return { ok: !error };
 }
 
-export function buildTribunalVoteKey(questionId: string, playerId: string) {
-  return `${questionId}::${playerId}`;
+/** Points attribués par réponse acceptée au Tribunal (une case du Mini-Bac). */
+export const MINIBAC_POINTS_PER_CELL = 20;
+
+export function buildTribunalCellVoteKey(
+  questionId: string,
+  playerId: string,
+  cellIndex: number,
+) {
+  return `${questionId}::${playerId}::${cellIndex}`;
 }
 
 export async function submitTribunalVoteRemote(
@@ -344,6 +351,7 @@ export async function submitTribunalVoteRemote(
   voterId: string,
   targetQuestionId: string,
   targetPlayerId: string,
+  cellIndex: number,
   vote: "accept" | "reject",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
@@ -360,7 +368,7 @@ export async function submitTribunalVoteRemote(
   }
 
   const gd = (data.game_data || {}) as Record<string, unknown>;
-  const key = buildTribunalVoteKey(targetQuestionId, targetPlayerId);
+  const key = buildTribunalCellVoteKey(targetQuestionId, targetPlayerId, cellIndex);
   const prev = (gd.tribunal_votes || {}) as Record<
     string,
     Record<string, "accept" | "reject">
@@ -435,16 +443,23 @@ export async function finishTribunalRemote(roomCode: string) {
   for (const entry of minibac_history) {
     const q = questions.find((x) => x.id === entry.questionId);
     if (!q || q.type !== "minibac") continue;
-    const pts = q.points ?? 200;
     for (const playerId of Object.keys(entry.submissions || {})) {
-      const key = buildTribunalVoteKey(entry.questionId, playerId);
-      const v = tribunal_votes[key] || {};
-      const votes = Object.values(v);
-      if (votes.length === 0) continue;
-      const acc = votes.filter((x) => x === "accept").length;
-      const rej = votes.filter((x) => x === "reject").length;
-      if (acc > rej) {
-        scores[playerId] = (scores[playerId] || 0) + pts;
+      const sub = entry.submissions[playerId];
+      const n = Math.min(
+        4,
+        sub.categories?.length ?? 0,
+        sub.values?.length ?? 0,
+      );
+      for (let cellIndex = 0; cellIndex < n; cellIndex++) {
+        const key = buildTribunalCellVoteKey(entry.questionId, playerId, cellIndex);
+        const v = tribunal_votes[key] || {};
+        const votes = Object.values(v);
+        if (votes.length === 0) continue;
+        const acc = votes.filter((x) => x === "accept").length;
+        const rej = votes.filter((x) => x === "reject").length;
+        if (acc > rej) {
+          scores[playerId] = (scores[playerId] || 0) + MINIBAC_POINTS_PER_CELL;
+        }
       }
     }
   }

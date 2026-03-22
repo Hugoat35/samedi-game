@@ -12,7 +12,8 @@ import {
   submitTribunalVoteRemote,
   advanceTribunalRemote,
   finishTribunalRemote,
-  buildTribunalVoteKey,
+  buildTribunalCellVoteKey,
+  MINIBAC_POINTS_PER_CELL,
   type MinibacSubmission,
 } from "@/lib/lobby-remote";
 import { levenshtein, normalizeAnswer } from "@/lib/levenshtein";
@@ -257,14 +258,42 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   };
 
   const tribunalQueue = useMemo(() => {
-    const items: Array<{ questionId: string; playerId: string; submission: MinibacSubmission }> = [];
-    for (const entry of minibacHistory as Array<{ questionId: string; submissions: Record<string, MinibacSubmission> }>) {
+    const items: Array<{
+      questionId: string;
+      playerId: string;
+      cellIndex: number;
+      categoryLabel: string;
+      value: string;
+      letter: string;
+    }> = [];
+    for (const entry of minibacHistory as Array<{
+      questionId: string;
+      submissions: Record<string, MinibacSubmission>;
+    }>) {
       for (const [playerId, sub] of Object.entries(entry.submissions || {})) {
-        items.push({ questionId: entry.questionId, playerId, submission: sub });
+        const cats = sub.categories || [];
+        const vals = sub.values || [];
+        const n = Math.min(4, cats.length, vals.length);
+        for (let i = 0; i < n; i++) {
+          items.push({
+            questionId: entry.questionId,
+            playerId,
+            cellIndex: i,
+            categoryLabel: cats[i] ?? "",
+            value: vals[i] ?? "",
+            letter: sub.letter ?? "?",
+          });
+        }
       }
     }
     const order = new Map(players.map((p, i) => [p.id, i]));
-    items.sort((a, b) => (order.get(a.playerId) ?? 0) - (order.get(b.playerId) ?? 0));
+    items.sort((a, b) => {
+      const oa = order.get(a.playerId) ?? 0;
+      const ob = order.get(b.playerId) ?? 0;
+      if (oa !== ob) return oa - ob;
+      if (a.questionId !== b.questionId) return a.questionId.localeCompare(b.questionId);
+      return a.cellIndex - b.cellIndex;
+    });
     return items;
   }, [minibacHistory, players]);
 
@@ -280,10 +309,19 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
 
     const handleVote = async (vote: "accept" | "reject") => {
       if (!current) return;
-      await submitTribunalVoteRemote(roomCode, myPlayerId, current.questionId, current.playerId, vote);
+      await submitTribunalVoteRemote(
+        roomCode,
+        myPlayerId,
+        current.questionId,
+        current.playerId,
+        current.cellIndex,
+        vote,
+      );
     };
 
-    const voteKey = current ? buildTribunalVoteKey(current.questionId, current.playerId) : "";
+    const voteKey = current
+      ? buildTribunalCellVoteKey(current.questionId, current.playerId, current.cellIndex)
+      : "";
     const votesForGrid = voteKey ? tribunalVotes[voteKey] || {} : {};
     const voters = players.filter((p) => p.id !== current?.playerId);
     const allVotersDone = voters.length === 0 || voters.every((v) => votesForGrid[v.id]);
@@ -296,29 +334,37 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           className="bg-white/95 p-8 rounded-[2rem] shadow-lg w-full border border-violet-100"
         >
           <h2 className="text-3xl font-black text-slate-900 mb-2">⚖️ Le Tribunal</h2>
-          <p className="text-slate-600 mb-6 text-sm font-medium">
-            Validez les grilles Mini-Bac une par une avant le podium.
+          <p className="text-slate-600 mb-2 text-sm font-medium leading-snug">
+            Une réponse à la fois : votez pour chaque case.{" "}
+            <span className="text-violet-700 font-bold">+{MINIBAC_POINTS_PER_CELL} pts</span> par réponse
+            acceptée (majorité).
           </p>
+          {tribunalQueue.length > 0 && (
+            <p className="text-xs text-slate-400 mb-4 font-semibold">
+              Étape {tribunalCursor + 1} / {tribunalQueue.length}
+            </p>
+          )}
 
           {!current ? (
-            <p className="text-slate-500 mb-6">Aucune grille à juger.</p>
+            <p className="text-slate-500 mb-6">Aucune réponse à juger.</p>
           ) : (
             <>
-              <p className="text-lg font-bold text-violet-700 mb-4">
-                Grille de <span className="text-slate-900">{playerName(current.playerId)}</span>
+              <p className="text-base font-bold text-violet-700 mb-3">
+                <span className="text-slate-900">{playerName(current.playerId)}</span>
+                <span className="text-slate-500 font-medium"> · réponse {current.cellIndex + 1}/4</span>
               </p>
-              <div className="mb-6 rounded-2xl bg-violet-50 p-6 text-left">
-                <div className="text-center text-7xl font-black text-violet-600 mb-4">
-                  {current.submission.letter}
-                </div>
-                {(current.submission.categories || []).map((cat, i) => (
-                  <div key={i} className="mb-3 flex flex-col gap-1">
-                    <span className="text-xs font-bold uppercase text-slate-500">{cat}</span>
-                    <span className="text-lg font-bold text-slate-800">
-                      {current.submission.values[i] ?? "—"}
+              <div className="mb-5 rounded-xl bg-violet-50/90 p-4 text-left border border-violet-100">
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="shrink-0 flex h-14 w-14 items-center justify-center rounded-lg bg-violet-600 text-3xl font-black text-white shadow-sm">
+                    {current.letter}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">
+                      {current.categoryLabel}
                     </span>
+                    <p className="text-lg font-bold text-slate-900 leading-tight break-words">{current.value}</p>
                   </div>
-                ))}
+                </div>
               </div>
 
               {myPlayerId === current.playerId ? (
@@ -367,7 +413,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       onClick={() => advanceTribunalRemote(roomCode)}
                       className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg"
                     >
-                      Grille suivante
+                      Réponse suivante
                     </motion.button>
                   ) : (
                     <motion.button
@@ -511,26 +557,33 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           <div className="flex-1 flex flex-col gap-4 w-full">
             {isMinibac ? (
               <>
-                <div className="text-center text-8xl font-black text-violet-600 drop-shadow-sm">
-                  {currentQuestion.letter}
+                <div className="flex items-center justify-center gap-3 rounded-2xl bg-violet-50/80 px-4 py-3 border border-violet-100">
+                  <span className="text-xs font-bold uppercase tracking-wider text-violet-600">Lettre</span>
+                  <span className="text-5xl font-black leading-none text-violet-600 tabular-nums">
+                    {currentQuestion.letter}
+                  </span>
                 </div>
-                {(currentQuestion.categories ?? []).map((cat, i) => (
-                  <div key={i} className="flex flex-col gap-2 text-left">
-                    <label className="text-sm font-bold text-slate-600">{cat}</label>
-                    <input
-                      type="text"
-                      value={minibacValues[i] ?? ""}
-                      onChange={(e) => {
-                        const next = [...minibacValues];
-                        next[i] = e.target.value;
-                        setMinibacValues(next);
-                      }}
-                      disabled={hasLockedAnswer || phase !== "question"}
-                      className="w-full text-xl font-bold py-4 px-4 rounded-2xl border border-slate-200 shadow-inner bg-white/90 focus:ring-4 focus:ring-violet-400 outline-none disabled:opacity-50"
-                      placeholder="Ta réponse…"
-                    />
-                  </div>
-                ))}
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  {(currentQuestion.categories ?? []).map((cat, i) => (
+                    <div key={i} className="flex flex-col gap-1 text-left min-w-0">
+                      <label className="text-[11px] font-bold text-slate-500 leading-tight line-clamp-2">
+                        {cat}
+                      </label>
+                      <input
+                        type="text"
+                        value={minibacValues[i] ?? ""}
+                        onChange={(e) => {
+                          const next = [...minibacValues];
+                          next[i] = e.target.value;
+                          setMinibacValues(next);
+                        }}
+                        disabled={hasLockedAnswer || phase !== "question"}
+                        className="w-full text-base font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/95 focus:ring-2 focus:ring-violet-400 outline-none disabled:opacity-50"
+                        placeholder="…"
+                      />
+                    </div>
+                  ))}
+                </div>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.95 }}
@@ -540,7 +593,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                     phase !== "question" ||
                     minibacValues.some((v) => !String(v).trim())
                   }
-                  className={`w-full py-5 rounded-2xl font-bold text-xl transition ${submitLockedClass} disabled:opacity-50`}
+                  className={`w-full py-3.5 rounded-2xl font-bold text-lg transition ${submitLockedClass} disabled:opacity-50`}
                 >
                   {hasLockedAnswer ? "Réponse envoyée ✓" : "Valider ma grille"}
                 </motion.button>
@@ -583,18 +636,21 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               >
                 {isMinibac ? (
                   <>
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                       Mini-Bac
                     </p>
-                    <p className="text-slate-700 font-medium mb-2">
-                      Les points seront attribués après le vote au Tribunal.
+                    <p className="text-slate-600 text-sm mb-3">
+                      Points au Tribunal : <span className="font-bold text-violet-700">+{MINIBAC_POINTS_PER_CELL} pts</span>{" "}
+                      par réponse acceptée.
                     </p>
                     {myMinibac && (
-                      <div className="text-left mt-4 space-y-2">
+                      <div className="text-left mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-left">
                         {(myMinibac.categories || []).map((c, i) => (
-                          <p key={i} className="text-sm">
-                            <span className="font-bold text-slate-600">{c} : </span>
-                            <span>{myMinibac.values[i]}</span>
+                          <p key={i} className="text-xs col-span-1">
+                            <span className="font-semibold text-slate-500 block truncate" title={c}>
+                              {c}
+                            </span>
+                            <span className="text-slate-800 font-bold">{myMinibac.values[i]}</span>
                           </p>
                         ))}
                       </div>
