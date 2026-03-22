@@ -1,201 +1,416 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
-import type { QuizQuestion } from "@/lib/quiz-bank";
+import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { useLobbyPlayers } from "@/hooks/use-lobby-players";
+import { useRoomState } from "@/hooks/use-room-state";
+import { isSupabaseConfigured } from "@/lib/env";
+import { createRoomRemote, joinRoomRemote, leaveRoomRemote, startGameRemote } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
-import { nextQuestionRemote, endGameRemote, returnToLobbyRemote } from "@/lib/lobby-remote";
+import { mockLobbyStore } from "@/lib/mock-lobby-store";
+import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
-type QuizGameProps = {
-  roomCode: string;
-  roomState: any;
-  myPlayerId: string;
-  isHost: boolean;
-  players: Player[];
+// IMPORT DU NOUVEAU JEU !
+import QuizGame from "@/components/quiz-game";
+
+type View = "home" | "join" | "create" | "lobby" | "playing";
+
+const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
+const pageTransition = {
+  initial: { opacity: 0, y: 16, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -12, filter: "blur(4px)" },
+  transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-// Durées dynamiques selon le type de question
-const GET_DURATION = (type: string) => {
-  if (type === "true_false") return 5;
-  if (type === "qcm") return 10;
-  return 15; // Estimation et Ouverte
-};
+export default function GameApp() {
+  const remote = isSupabaseConfigured();
 
-export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, players }: QuizGameProps) {
-  const questions: QuizQuestion[] = roomState?.game_data?.questions || [];
-  const currentIndex = roomState?.current_question_index || 0;
-  const gameState = roomState?.game_state; // 'playing' ou 'finished'
-  const currentQuestion = questions[currentIndex];
+  const [view, setView] = useState<View>("home");
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [localPlayers, setLocalPlayers] = useState<Player[]>([]);
+  const [pin, setPin] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
+  const [isLeavingRoom, setIsLeavingRoom] = useState(false);
+  
+  const [pseudo, setPseudo] = useState("");
+  const [avatar, setAvatar] = useState<string | null>(null);
+  
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [questionCount, setQuestionCount] = useState(5);
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const [timeLeft, setTimeLeft] = useState(15);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | number | null>(null);
-  const [phase, setPhase] = useState<"question" | "reveal">("question");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const roomState = useRoomState(roomCode);
 
-  // 1. DÉTECTER LE CHANGEMENT DE QUESTION
-  // Quand la base de données met à jour la question, on réinitialise l'écran
-  useEffect(() => {
-    if (gameState !== "playing" || !currentQuestion) return;
-    
-    setPhase("question");
-    setSelectedAnswer(null);
-    setTimeLeft(GET_DURATION(currentQuestion.type));
-  }, [currentIndex, currentQuestion, gameState]);
-
-  // 2. LE CHRONOMÈTRE
-  useEffect(() => {
-    if (phase !== "question" || gameState !== "playing") return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setPhase("reveal"); // Temps écoulé !
-          return 0;
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 150;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const min = Math.min(img.width, img.height);
+          const sx = (img.width - min) / 2;
+          const sy = (img.height - min) / 2;
+          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+          setAvatar(canvas.toDataURL("image/jpeg", 0.7));
         }
-        return prev - 1;
-      });
-    }, 1000);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
-    return () => clearInterval(timer);
-  }, [phase, gameState]);
+  const handleKickedByHost = useCallback(() => {
+    setIsLeavingRoom(false);
+    setView("home");
+    setRoomCode(null);
+    setMyPlayerId(null);
+    setIsHost(false);
+    setLocalPlayers([]);
+    setPin("");
+    setJoinError(null);
+    setBusy(false);
+    setSelectedGame(null);
+  }, []);
 
-  // 3. LE CHEF D'ORCHESTRE (L'Hôte gère la transition)
+  const { players: remotePlayers } = useLobbyPlayers(
+    roomCode,
+    Boolean(remote && view !== "home" && view !== "join" && view !== "create"),
+    remote ? { isHost, onRoomClosedByHost: handleKickedByHost } : undefined,
+  );
+
+  // ÉCOUTE LE JEU (Si l'hôte lance ou revient au lobby)
   useEffect(() => {
-    // Seul l'hôte a le droit de donner des ordres à la base de données
-    if (phase === "reveal" && isHost && gameState === "playing") {
-      const transitionTimer = setTimeout(async () => {
-        const nextIdx = currentIndex + 1;
-        
-        // Si c'était la dernière question, on termine le jeu
-        if (nextIdx >= questions.length) {
-          await endGameRemote(roomCode);
-        } else {
-          // Sinon, on passe à la suivante
-          await nextQuestionRemote(roomCode, nextIdx);
-        }
-      }, 5000); // 5 secondes pour lire la bonne réponse
+    if (roomState?.game_state === "playing" && view === "lobby") setView("playing");
+    if (roomState?.game_state === "lobby" && view === "playing") setView("lobby");
+  }, [roomState?.game_state, view]);
 
-      return () => clearTimeout(transitionTimer);
+  useEffect(() => {
+    if (!remote || !roomCode || !myPlayerId || view === "home") return;
+    const handleBeforeUnload = () => {
+      const supabase = getSupabaseBrowser();
+      if (supabase) {
+        supabase.channel(`lobby:${roomCode}`).send({
+          type: "broadcast",
+          event: isHost ? "room_closed" : "player_left"
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [remote, view, roomCode, myPlayerId, isHost]);
+
+  const playersRaw = remote ? remotePlayers : localPlayers;
+  const players = isLeavingRoom && myPlayerId ? playersRaw.filter((p) => p.id !== myPlayerId) : playersRaw;
+
+  const goHome = useCallback(async () => {
+    setJoinError(null);
+    if (roomCode && myPlayerId) {
+      setIsLeavingRoom(true);
+      if (remote) {
+        setBusy(true);
+        const supabase = getSupabaseBrowser();
+        if (supabase) {
+          await supabase.channel(`lobby:${roomCode}`).send({
+            type: "broadcast",
+            event: isHost ? "room_closed" : "player_left"
+          }).catch(() => {});
+        }
+        await leaveRoomRemote(roomCode, myPlayerId, isHost);
+        setBusy(false);
+      } else {
+        mockLobbyStore.leaveRoom(roomCode, myPlayerId);
+      }
     }
-  }, [phase, isHost, currentIndex, questions.length, roomCode, gameState]);
+    setIsLeavingRoom(false);
+    setView("home");
+    setRoomCode(null);
+    setLocalPlayers([]);
+    setMyPlayerId(null);
+    setIsHost(false);
+    setPin("");
+    setPseudo("");
+    setAvatar(null);
+    setSelectedGame(null);
+  }, [remote, roomCode, myPlayerId, isHost]);
 
-
-  const handleAnswerClick = (answer: string) => {
-    if (selectedAnswer !== null || phase !== "question") return;
-    setSelectedAnswer(answer);
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setJoinError(null);
+    if (remote) {
+      setBusy(true);
+      const result = await createRoomRemote(pseudo.trim() || "Anonyme", avatar || "");
+      setBusy(false);
+      if (result.ok) {
+        setRoomCode(result.code);
+        setMyPlayerId(result.myPlayerId);
+        setIsHost(true);
+        setView("lobby");
+      } else {
+        setJoinError(result.error);
+      }
+      return;
+    }
+    const { code, players: p, myPlayerId: id } = mockLobbyStore.createRoom(pseudo.trim(), avatar || "");
+    setRoomCode(code);
+    setLocalPlayers(p);
+    setMyPlayerId(id);
+    setIsHost(true);
+    setView("lobby");
   };
 
-  const handleReturnLobby = async () => {
-    if (isHost) await returnToLobbyRemote(roomCode);
+  const handleJoinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (remote) {
+      setBusy(true);
+      const result = await joinRoomRemote(pin, pseudo.trim() || "Anonyme", avatar || "");
+      setBusy(false);
+      if (result.ok) {
+        setRoomCode(result.code);
+        setMyPlayerId(result.myPlayerId);
+        setIsHost(false);
+        setView("lobby");
+      } else {
+        setJoinError(result.error);
+      }
+      return;
+    }
+    const result = mockLobbyStore.joinRoom(pin, pseudo.trim(), avatar || "");
+    if (result.ok) {
+      setRoomCode(result.code);
+      setLocalPlayers(result.players);
+      setMyPlayerId(result.myPlayerId);
+      setIsHost(false);
+      setView("lobby");
+    } else {
+      setJoinError(result.error);
+    }
   };
 
-  // --- ÉCRAN DE FIN (PODIUM) ---
-  if (gameState === "finished") {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center w-full max-w-md mx-auto text-center">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 p-8 rounded-[2rem] shadow-lg w-full">
-          <h2 className="text-4xl font-bold mb-4">🏆 Fin du Jeu !</h2>
-          <p className="text-slate-600 mb-8 font-medium">Le calcul des scores arrive bientôt...</p>
-          
-          <ul className="flex flex-col gap-3 mb-8">
-            {players.map((p, i) => (
-              <li key={p.id} className="bg-slate-100 py-3 px-4 rounded-xl font-bold text-slate-800 text-lg flex justify-between items-center">
-                <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👏"} {p.name}</span>
-                <span className="text-violet-600">0 pts</span>
-              </li>
-            ))}
-          </ul>
-
-          {isHost ? (
-            <button onClick={handleReturnLobby} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition">
-              Retour au Salon
-            </button>
-          ) : (
-            <p className="text-slate-400 font-bold animate-pulse">L'hôte va vous ramener au salon...</p>
-          )}
-        </motion.div>
-      </div>
-    );
-  }
-
-  // --- SÉCURITÉ CHARGEMENT ---
-  if (!currentQuestion) return <div className="text-center p-8 text-slate-500 font-bold">Chargement...</div>;
-
-  const duration = GET_DURATION(currentQuestion.type);
+  const handleStartGame = async () => {
+    setStartError(null);
+    if (remote && roomCode) {
+      setBusy(true);
+      const result = await startGameRemote(roomCode, questionCount);
+      setBusy(false);
+      
+      if (!result.ok) {
+        // CORRECTION VERCEL ICI 👇
+        setStartError(result.error || "Erreur inconnue au lancement");
+      }
+    }
+  };
 
   return (
-    <div className="flex flex-1 flex-col items-center w-full max-w-md mx-auto">
-      
-      {/* HEADER */}
-      <div className="w-full flex justify-between items-center mb-6 bg-white/60 px-6 py-3 rounded-full shadow-sm backdrop-blur-md">
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-          Question {currentIndex + 1} / {questions.length}
-        </span>
-        <span className="text-sm font-bold text-violet-600 bg-violet-100 px-3 py-1 rounded-full">
-          {currentQuestion.points} PTS
-        </span>
-      </div>
-
-      {/* LA QUESTION */}
-      <motion.div 
-        key={`q-${currentIndex}`}
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full bg-white/90 rounded-[2rem] p-8 shadow-md text-center mb-8 relative overflow-hidden"
-      >
-        <div className="absolute top-0 left-0 h-2 bg-slate-100 w-full">
-          <motion.div 
-            className={`h-full ${timeLeft <= 3 ? 'bg-red-500' : 'bg-gradient-to-r from-violet-500 to-fuchsia-500'}`}
-            initial={{ width: "100%" }}
-            animate={{ width: `${(timeLeft / duration) * 100}%` }}
-            transition={{ ease: "linear", duration: 1 }}
-          />
+    <div className="relative flex min-h-[100dvh] flex-col bg-[var(--app-bg)] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="relative z-10 mb-8 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet-600/90">Samedi</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Parties en ligne</h1>
         </div>
-
-        <span className="block text-4xl mb-4 mt-2">
-          {timeLeft > 0 ? (timeLeft <= 3 ? "⏳" : "🤔") : "🛑"}
-        </span>
-        <h2 className="text-2xl font-bold text-slate-800 leading-snug">
-          {currentQuestion.question}
-        </h2>
-      </motion.div>
-
-      {/* LES RÉPONSES */}
-      <div className="w-full flex-1 flex flex-col gap-3">
-        {(currentQuestion.type === "qcm" || currentQuestion.type === "true_false") && currentQuestion.options ? (
-          <div className="grid grid-cols-1 gap-3">
-            {currentQuestion.options.map((option, i) => {
-              const isSelected = selectedAnswer === option;
-              
-              let revealClass = "bg-white text-slate-700";
-              if (phase === "reveal") {
-                if (option === currentQuestion.answer) revealClass = "bg-green-500 text-white shadow-green-500/50 scale-[1.02] border-green-400";
-                else if (isSelected) revealClass = "bg-red-500 text-white shadow-red-500/50 opacity-80";
-                else revealClass = "bg-slate-100 text-slate-400 opacity-40";
-              } else if (isSelected) {
-                revealClass = "bg-violet-600 text-white shadow-violet-500/50 ring-4 ring-violet-200";
-              }
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleAnswerClick(option)}
-                  disabled={selectedAnswer !== null || phase !== "question"}
-                  className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border border-slate-100/50 ${revealClass} ${selectedAnswer === null && phase === "question" ? "hover:scale-[1.02] active:scale-95 hover:shadow-md" : ""}`}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white/50 rounded-3xl border-2 border-dashed border-slate-300 p-6 text-center">
-             <span className="text-4xl mb-2">🔢</span>
-             <p className="text-slate-500 font-bold">L'écran pour taper un chiffre ou du texte arrive très bientôt !</p>
-          </div>
+        {view !== "home" && (
+          <button onClick={() => void goHome()} disabled={busy} className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-white">
+            Quitter
+          </button>
         )}
-      </div>
+      </header>
 
+      <main className="relative z-10 flex flex-1 flex-col">
+        <AnimatePresence mode="wait">
+          
+          {view === "home" && (
+            <motion.section key="home" className="flex flex-1 flex-col justify-center gap-4" {...pageTransition}>
+              <button onClick={() => setView("create")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105">
+                Créer une partie
+              </button>
+              <button onClick={() => setView("join")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-sm transition hover:bg-white">
+                Rejoindre une partie
+              </button>
+            </motion.section>
+          )}
+
+          {view === "create" && (
+            <motion.section key="create" className="flex flex-1 flex-col justify-center" {...pageTransition}>
+              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
+                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
+                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Créer une salle</h2>
+                  
+                  <div 
+                    className="relative h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Optionnel)</span>
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+
+                  <input
+                    type="text" required placeholder="Entre ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
+                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-4 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                  />
+                </div>
+
+                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
+                
+                <button type="submit" disabled={busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
+                  {busy ? "Création en cours…" : "Confirmer et Créer"}
+                </button>
+                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
+              </form>
+            </motion.section>
+          )}
+
+          {view === "join" && (
+            <motion.section key="join" className="flex flex-1 flex-col justify-center" {...pageTransition}>
+              <form onSubmit={handleJoinSubmit} className="flex flex-col gap-6">
+                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
+                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Rejoindre une salle</h2>
+                  
+                  <input
+                    inputMode="numeric" pattern="\d{4}" maxLength={4} required placeholder="Code : • • • •"
+                    value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className="w-full rounded-[1.5rem] border-none bg-white/95 px-6 py-4 text-center font-mono text-2xl tracking-[0.2em] text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-violet-400/50"
+                  />
+                  
+                  <div className="h-px w-full bg-slate-200/50 my-2"></div>
+
+                  <div 
+                    className="relative h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Opt)</span>
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
+
+                  <input
+                    type="text" required placeholder="Ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
+                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-3 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                  />
+                </div>
+
+                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
+                <button type="submit" disabled={pin.length !== 4 || busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
+                  {busy ? "Connexion…" : "Entrer dans la salle"}
+                </button>
+                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
+              </form>
+            </motion.section>
+          )}
+
+          {view === "lobby" && roomCode && (
+            <motion.section key="lobby" className="flex flex-1 flex-col" {...pageTransition}>
+              <div className="mb-8 rounded-[2rem] bg-white/85 p-6 shadow-sm backdrop-blur-md">
+                <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500">Code de la salle</p>
+                <p className="mt-3 text-center font-mono text-4xl font-bold tracking-[0.35em] text-slate-900">{roomCode}</p>
+              </div>
+
+              <div className="flex flex-1 flex-col rounded-[2rem] bg-white/70 p-5 shadow-sm backdrop-blur-sm">
+                <h2 className="mb-4 text-sm font-bold text-slate-600 uppercase tracking-wide">Joueurs ({players.length})</h2>
+                <ul className="flex flex-col gap-3">
+                  <AnimatePresence>
+                    {players.map((p) => (
+                      <motion.li key={p.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-lg font-bold text-white shadow-inner overflow-hidden border-2 border-white">
+                          {p.avatar && p.avatar.startsWith("data:image") ? <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" /> : <span>{p.name.slice(0, 2).toUpperCase()}</span>}
+                        </span>
+                        <span className="font-bold text-slate-800 text-lg">{p.name}</span>
+                        {p.id === myPlayerId && <span className="ml-auto text-xs font-bold text-violet-500 bg-violet-100 px-2 py-1 rounded-full">MOI</span>}
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
+                </ul>
+
+                {isHost ? (
+                  <div className="mt-8 border-t border-slate-200/50 pt-6">
+                    {!selectedGame ? (
+                      <div className="flex flex-col gap-3 animate-in fade-in">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center mb-2">Choisir un jeu</h3>
+                        <button 
+                          onClick={() => setSelectedGame('culture-quiz')}
+                          className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-[2px] transition hover:scale-[1.02] shadow-sm"
+                        >
+                          <div className="flex h-full w-full items-center justify-between rounded-[14px] bg-white px-5 py-4">
+                            <span className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</span>
+                            <span className="text-violet-500 font-bold text-sm">Sélectionner →</span>
+                          </div>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</h3>
+                          <button onClick={() => setSelectedGame(null)} className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition">
+                            Changer
+                          </button>
+                        </div>
+                        
+                        <label className="text-sm font-bold text-slate-600 uppercase tracking-wider block text-center">
+                          Nombre de questions : <span className="text-violet-600 text-xl">{questionCount}</span>
+                        </label>
+                        <input 
+                          type="range" min="3" max="15" step="1" 
+                          value={questionCount} 
+                          onChange={(e) => setQuestionCount(Number(e.target.value))} 
+                          className="w-full accent-violet-600 mb-4" 
+                        />
+                        
+                        {startError && (
+                          <p className="text-center text-sm font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100 mb-2">
+                            {startError}
+                          </p>
+                        )}
+                        
+                        <button 
+                          onClick={handleStartGame} disabled={busy || players.length < 1} 
+                          className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          {busy ? "Démarrage..." : "LANCER LA PARTIE !"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-8 border-t border-slate-200/50 pt-6 text-center">
+                    <p className="text-sm font-bold text-slate-500 animate-pulse">En attente de l'hôte...</p>
+                  </div>
+                )}
+              </div>
+            </motion.section>
+          )}
+
+          {/* C'EST ICI QU'ON APPELLE TON NOUVEAU COMPOSANT DE JEU */}
+          {view === "playing" && roomState && roomCode && myPlayerId && (
+            <motion.section key="playing" className="flex flex-1 flex-col" {...pageTransition}>
+              <QuizGame 
+                roomCode={roomCode} 
+                roomState={roomState} 
+                myPlayerId={myPlayerId} 
+                isHost={isHost} 
+                players={players} 
+              />
+            </motion.section>
+          )}
+
+        </AnimatePresence>
+      </main>
     </div>
   );
 }
