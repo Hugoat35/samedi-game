@@ -1,3 +1,5 @@
+import { GEO_FLAG_ROWS, GEO_SHAPE_ROWS } from "./geo-quiz-data";
+
 export type QuestionType =
   | "qcm"
   | "estimation"
@@ -36,6 +38,26 @@ export function buildGeoFlagUrl(countryCode: string): string {
 export function buildGeoShapeUrl(countryCode: string): string {
   return `https://cdn.jsdelivr.net/gh/djaiss/mapsicon@master/countries/${countryCode.toLowerCase()}/128.png`;
 }
+
+const GEO_FLAG_QUESTIONS: QuizQuestion[] = GEO_FLAG_ROWS.map((r, i) => ({
+  id: `gf-${i}-${r.code}`,
+  type: "geo_flag",
+  question: "Quel pays correspond à ce drapeau ?",
+  answer: r.answer,
+  answerAliases: r.aliases,
+  countryCode: r.code,
+  points: 120,
+}));
+
+const GEO_SHAPE_QUESTIONS: QuizQuestion[] = GEO_SHAPE_ROWS.map((r, i) => ({
+  id: `gs-${i}-${r.code}`,
+  type: "geo_shape",
+  question: "À quel pays correspond cette forme ?",
+  answer: r.answer,
+  answerAliases: r.aliases,
+  countryCode: r.code,
+  points: 140,
+}));
 
 // Les catégories possibles pour le Mini-Bac
 const MINI_BAC_CATEGORIES = [
@@ -211,285 +233,76 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "date27", type: "date", question: "En quelle année a débuté la guerre du Vietnam ?", answer: 1955, points: 200 },
   { id: "date28", type: "date", question: "En quelle année a été fondé l'empire romain ?", answer: -27, points: 250 },
 
-  // 🌍 GÉO — DRAPEAU (écrire le pays)
-  {
-    id: "gf1",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "France",
-    countryCode: "fr",
-    points: 120,
-  },
-  {
-    id: "gf2",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Japon",
-    countryCode: "jp",
-    points: 120,
-  },
-  {
-    id: "gf3",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Brésil",
-    countryCode: "br",
-    points: 120,
-  },
-  {
-    id: "gf4",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Canada",
-    countryCode: "ca",
-    points: 120,
-  },
-  {
-    id: "gf5",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Allemagne",
-    countryCode: "de",
-    points: 120,
-  },
-  {
-    id: "gf6",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Italie",
-    countryCode: "it",
-    points: 120,
-  },
-  {
-    id: "gf7",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Mexique",
-    countryCode: "mx",
-    points: 120,
-  },
-  {
-    id: "gf8",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Australie",
-    countryCode: "au",
-    points: 120,
-  },
-  {
-    id: "gf9",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Inde",
-    countryCode: "in",
-    points: 120,
-  },
-  {
-    id: "gf10",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Argentine",
-    countryCode: "ar",
-    points: 120,
-  },
-  {
-    id: "gf11",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Portugal",
-    countryCode: "pt",
-    points: 120,
-  },
-  {
-    id: "gf12",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Norvège",
-    countryCode: "no",
-    points: 120,
-  },
-  {
-    id: "gf13",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "États-Unis",
-    answerAliases: ["USA", "Etats-Unis", "United States"],
-    countryCode: "us",
-    points: 120,
-  },
-  {
-    id: "gf14",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Royaume-Uni",
-    answerAliases: ["UK", "Angleterre", "Grande-Bretagne"],
-    countryCode: "gb",
-    points: 120,
-  },
-  {
-    id: "gf15",
-    type: "geo_flag",
-    question: "Quel pays correspond à ce drapeau ?",
-    answer: "Corée du Sud",
-    answerAliases: ["Coree du Sud", "Corée", "Coree"],
-    countryCode: "kr",
-    points: 130,
-  },
-
-  // 🗺️ GÉO — SILHOUETTE (forme du pays)
-  {
-    id: "gs1",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "France",
-    countryCode: "fr",
-    points: 140,
-  },
-  {
-    id: "gs2",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Italie",
-    countryCode: "it",
-    points: 140,
-  },
-  {
-    id: "gs3",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Espagne",
-    countryCode: "es",
-    points: 140,
-  },
-  {
-    id: "gs4",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Allemagne",
-    countryCode: "de",
-    points: 140,
-  },
-  {
-    id: "gs5",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Grèce",
-    countryCode: "gr",
-    points: 140,
-  },
-  {
-    id: "gs6",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Norvège",
-    countryCode: "no",
-    points: 140,
-  },
-  {
-    id: "gs7",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Japon",
-    countryCode: "jp",
-    points: 140,
-  },
-  {
-    id: "gs8",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Chili",
-    countryCode: "cl",
-    points: 150,
-  },
-  {
-    id: "gs9",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Vietnam",
-    countryCode: "vn",
-    points: 150,
-  },
-  {
-    id: "gs10",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Croatie",
-    countryCode: "hr",
-    points: 150,
-  },
-  {
-    id: "gs11",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Islande",
-    countryCode: "is",
-    points: 150,
-  },
-  {
-    id: "gs12",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Madagascar",
-    countryCode: "mg",
-    points: 150,
-  },
-  {
-    id: "gs13",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "États-Unis",
-    answerAliases: ["USA", "Etats-Unis"],
-    countryCode: "us",
-    points: 130,
-  },
-  {
-    id: "gs14",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Brésil",
-    countryCode: "br",
-    points: 130,
-  },
-  {
-    id: "gs15",
-    type: "geo_shape",
-    question: "À quel pays correspond cette forme ?",
-    answer: "Australie",
-    countryCode: "au",
-    points: 130,
-  },
+  ...GEO_FLAG_QUESTIONS,
+  ...GEO_SHAPE_QUESTIONS,
 ];
+
+function shuffle<T>(arr: T[]): T[] {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
 
 // --- GÉNÉRATEUR DYNAMIQUE DE QUESTIONS ---
 export function getRandomQuestions(count: number): QuizQuestion[] {
-  // 1. On mélange la grande banque de questions
-  const shuffled = [...QUIZ_BANK].sort(() => 0.5 - Math.random());
-  const selected = shuffled.slice(0, Math.min(count, QUIZ_BANK.length));
+  const geoFlags = QUIZ_BANK.filter((q) => q.type === "geo_flag");
+  const geoShapes = QUIZ_BANK.filter((q) => q.type === "geo_shape");
+  const nonGeo = QUIZ_BANK.filter(
+    (q) => q.type !== "geo_flag" && q.type !== "geo_shape",
+  );
 
-  // 2. LA MAGIE DU MINI-BAC : 
-  // Si la partie comporte au moins 5 questions, on injecte 1 ou 2 Mini-Bacs aléatoires !
+  /** Au moins 1 drapeau dès 3 questions ; plus de drapeaux quand la partie s’allonge */
+  let wantFlags =
+    count >= 3
+      ? Math.min(Math.max(1, Math.floor(count / 4)), 8, geoFlags.length, count)
+      : 0;
+
+  let wantShapes = 0;
+  if (count >= 6) {
+    wantShapes = Math.min(1, geoShapes.length, count - wantFlags);
+  }
+  if (count >= 14) {
+    wantShapes = Math.min(2, geoShapes.length, count - wantFlags);
+  }
+  if (count >= 22) {
+    wantShapes = Math.min(3, geoShapes.length, count - wantFlags);
+  }
+
+  while (wantFlags + wantShapes > count) {
+    if (wantShapes > 0) wantShapes--;
+    else wantFlags--;
+  }
+
+  const pickedFlags = shuffle(geoFlags).slice(0, wantFlags);
+  const pickedShapes = shuffle(geoShapes).slice(0, wantShapes);
+  const need = Math.max(0, count - pickedFlags.length - pickedShapes.length);
+  const pickedRest = shuffle(nonGeo).slice(0, need);
+
+  let selected = shuffle([...pickedFlags, ...pickedShapes, ...pickedRest]);
+
+  if (selected.length < count) {
+    const ids = new Set(selected.map((q) => q.id));
+    const extra = shuffle(nonGeo).filter((q) => !ids.has(q.id));
+    selected = [...selected, ...extra].slice(0, count);
+  }
+
+  // 2. LA MAGIE DU MINI-BAC
   if (count >= 5) {
-    const numMiniBacs = count >= 15 ? 2 : 1; // 2 mini-bacs si c'est une très longue partie
-    
+    const numMiniBacs = count >= 15 ? 2 : 1;
+
     for (let i = 0; i < numMiniBacs; i++) {
-      // Choix d'une lettre au hasard
       const randomLetter = MINI_BAC_LETTERS[Math.floor(Math.random() * MINI_BAC_LETTERS.length)];
-      
-      // Choix de 4 catégories au hasard
-      const shuffledCategories = [...MINI_BAC_CATEGORIES].sort(() => 0.5 - Math.random()).slice(0, 4);
-      
+      const shuffledCategories = shuffle([...MINI_BAC_CATEGORIES]).slice(0, 4);
+
       const miniBacQuestion: QuizQuestion = {
         id: `minibac-${Date.now()}-${i}`,
         type: "minibac",
-        question: `Mini-Bac : Lettre ${randomLetter}`, // Le titre de la question
-        answer: "vote", // L'answer n'est pas fixe, elle dépendra du vote !
-        points: 200, // Le mini-bac rapporte gros
+        question: `Mini-Bac : Lettre ${randomLetter}`,
+        answer: "vote",
+        points: 200,
         letter: randomLetter,
-        categories: shuffledCategories
+        categories: shuffledCategories,
       };
 
-      // On remplace une question normale (vers la fin du quiz pour le suspense) par ce Mini-Bac
-      const replaceIndex = Math.floor(count * 0.6) + i; 
+      const replaceIndex = Math.floor(count * 0.6) + i;
       if (replaceIndex < selected.length) {
         selected[replaceIndex] = miniBacQuestion;
       }
