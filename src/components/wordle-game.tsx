@@ -131,7 +131,12 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [dictOk, setDictOk] = useState<boolean | null>(null);
-  const dictCheckId = useRef(0);
+  /** Erreur RPC : ne pas confondre avec « mot absent ». */
+  const [dictRpcError, setDictRpcError] = useState<string | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const wordLenRef = useRef(wordLen);
+  wordLenRef.current = wordLen;
 
   const keyHints = useMemo(() => bestKeyHints(guesses), [guesses]);
 
@@ -143,17 +148,29 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
     const full = w.length === wordLen && /^[A-Z]+$/.test(w);
     if (!full) {
       setDictOk(null);
+      setDictRpcError(null);
       return;
     }
-    const id = ++dictCheckId.current;
     setDictOk(null);
+    setDictRpcError(null);
+    const target = w;
+    const lenAtSchedule = wordLen;
     const t = setTimeout(() => {
       void (async () => {
-        const ok = await wordleWordExistsRemote(w);
-        if (dictCheckId.current !== id) return;
-        setDictOk(ok);
+        const res = await wordleWordExistsRemote(target);
+        const cur = draftRef.current.trim().toUpperCase();
+        if (cur !== target || cur.length !== wordLenRef.current || wordLenRef.current !== lenAtSchedule) {
+          return;
+        }
+        if (res.rpcError) {
+          setDictRpcError(res.rpcError);
+          setDictOk(null);
+          return;
+        }
+        setDictRpcError(null);
+        setDictOk(res.inDictionary);
       })();
-    }, 200);
+    }, 150);
     return () => clearTimeout(t);
   }, [draft, wordLen]);
 
@@ -162,6 +179,7 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
     myTurn &&
     draftLooksFull &&
     dictOk === true &&
+    !dictRpcError &&
     !busy &&
     gameState === "playing";
 
@@ -173,11 +191,13 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
     if (!myTurn || busy) return;
     setDraft((d) => (d.length >= wordLen ? d : d + ch));
     setErr(null);
+    setDictRpcError(null);
   };
 
   const backspace = () => {
     if (!myTurn || busy) return;
     setDraft((d) => d.slice(0, -1));
+    setDictRpcError(null);
   };
 
   const submit = async () => {
@@ -346,6 +366,7 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
                 .slice(0, wordLen);
               setDraft(v);
               setErr(null);
+              setDictRpcError(null);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") void submit();
@@ -361,11 +382,24 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
             onClick={() => void submit()}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 disabled:opacity-40 sm:px-5 sm:py-2.5 sm:text-base"
           >
-            {busy ? "…" : draftLooksFull && dictOk === null ? "…" : "Valider"}
+            {busy
+              ? "…"
+              : draftLooksFull && dictOk === null && !dictRpcError
+                ? "…"
+                : "Valider"}
           </motion.button>
         </div>
-        {draftLooksFull && dictOk === false && (
+        {draftLooksFull && dictOk === null && !dictRpcError && myTurn && (
+          <p className="text-center text-[11px] font-medium text-slate-500">Vérification du mot…</p>
+        )}
+        {draftLooksFull && dictOk === false && !dictRpcError && (
           <p className="text-center text-[11px] font-semibold text-amber-700">Mot absent du dictionnaire.</p>
+        )}
+        {dictRpcError && draftLooksFull && (
+          <p className="text-center text-[11px] font-semibold text-red-600">
+            Impossible de vérifier le mot. Connexion ou fonction SQL « wordle_word_exists » (migration 010). Détail :{" "}
+            <span className="break-all font-mono font-normal opacity-90">{dictRpcError}</span>
+          </p>
         )}
         {err && <p className="text-center text-xs font-semibold text-red-600">{err}</p>}
 

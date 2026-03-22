@@ -739,55 +739,62 @@ export default function GameApp() {
                               <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-800 sm:text-xs">
                                 Longueur des mots ({WORDLE_LEN_LO}–{WORDLE_LEN_HI} lettres)
                               </p>
-                              <div className="relative mb-2 h-9">
-                                <div
-                                  className="pointer-events-none absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200"
-                                  aria-hidden
-                                />
-                                <div
-                                  className="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-emerald-500"
-                                  style={{
-                                    left: `${((wordleLenMin - WORDLE_LEN_LO) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
-                                    width: `${((wordleLenMax - wordleLenMin) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
-                                  }}
-                                  aria-hidden
-                                />
+                              <div className="mb-2 flex items-center gap-2 sm:gap-3">
+                                <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
+                                  Min
+                                </span>
                                 <input
                                   type="range"
                                   min={WORDLE_LEN_LO}
                                   max={WORDLE_LEN_HI}
+                                  step={1}
                                   value={wordleLenMin}
                                   onChange={(e) => {
                                     const v = Number(e.target.value);
                                     setWordleLenMin(Math.min(v, wordleLenMax));
                                   }}
-                                  className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-emerald-600"
-                                  style={{ zIndex: wordleLenMin >= wordleLenMax ? 5 : 3 }}
+                                  className="min-h-9 flex-1 cursor-pointer accent-emerald-600"
                                   aria-label="Longueur minimale des mots"
                                 />
+                                <span className="w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-emerald-700 sm:w-8">
+                                  {wordleLenMin}
+                                </span>
+                              </div>
+                              <div className="mb-2 flex items-center gap-2 sm:gap-3">
+                                <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
+                                  Max
+                                </span>
                                 <input
                                   type="range"
                                   min={WORDLE_LEN_LO}
                                   max={WORDLE_LEN_HI}
+                                  step={1}
                                   value={wordleLenMax}
                                   onChange={(e) => {
                                     const v = Number(e.target.value);
                                     setWordleLenMax(Math.max(v, wordleLenMin));
                                   }}
-                                  className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent accent-teal-600"
-                                  style={{ zIndex: wordleLenMax <= wordleLenMin ? 5 : 4 }}
+                                  className="min-h-9 flex-1 cursor-pointer accent-teal-600"
                                   aria-label="Longueur maximale des mots"
                                 />
-                              </div>
-                              <div className="flex justify-between gap-2 text-[10px] font-semibold text-slate-600 sm:text-xs">
-                                <span>Min : {wordleLenMin}</span>
-                                <span className="text-center text-emerald-700">
-                                  {wordleLenMin === wordleLenMax
-                                    ? `Fixé à ${wordleLenMin} lettre${wordleLenMin > 1 ? "s" : ""}`
-                                    : `De ${wordleLenMin} à ${wordleLenMax} lettres`}
+                                <span className="w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-teal-700 sm:w-8">
+                                  {wordleLenMax}
                                 </span>
-                                <span>Max : {wordleLenMax}</span>
                               </div>
+                              <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                <div
+                                  className="absolute inset-y-0 rounded-full bg-emerald-500"
+                                  style={{
+                                    left: `${((wordleLenMin - WORDLE_LEN_LO) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
+                                    width: `${((wordleLenMax - wordleLenMin) / (WORDLE_LEN_HI - WORDLE_LEN_LO)) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <p className="mt-2 text-center text-[10px] font-semibold text-emerald-800 sm:text-xs">
+                                {wordleLenMin === wordleLenMax
+                                  ? `Fixé à ${wordleLenMin} lettre${wordleLenMin > 1 ? "s" : ""}`
+                                  : `Plage active : ${wordleLenMin} à ${wordleLenMax} lettres`}
+                              </p>
                             </div>
                             <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                               <span className="font-semibold text-slate-600">Manches</span>

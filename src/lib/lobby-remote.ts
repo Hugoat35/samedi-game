@@ -434,15 +434,25 @@ export async function startWordleGameRemote(
   return { ok: true };
 }
 
+export type WordleWordLookup = {
+  inDictionary: boolean;
+  /** Si défini, la présence dans le dictionnaire n’a pas pu être vérifiée (réseau, RPC manquante, etc.). */
+  rpcError: string | null;
+};
+
 /** Indique si le mot figure dans `wordle_dictionary` (source de vérité = base). */
-export async function wordleWordExistsRemote(word: string): Promise<boolean> {
+export async function wordleWordExistsRemote(word: string): Promise<WordleWordLookup> {
   const supabase = getSupabaseBrowser();
-  if (!supabase) return false;
+  if (!supabase) {
+    return { inDictionary: false, rpcError: "Supabase non configuré." };
+  }
   const { data, error } = await supabase.rpc("wordle_word_exists", {
     p_word: word.trim().toUpperCase(),
   });
-  if (error) return false;
-  return Boolean(data);
+  if (error) {
+    return { inDictionary: false, rpcError: error.message };
+  }
+  return { inDictionary: Boolean(data), rpcError: null };
 }
 
 export async function submitWordleGuessRemote(
