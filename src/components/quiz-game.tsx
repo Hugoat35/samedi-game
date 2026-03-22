@@ -15,12 +15,14 @@ type QuizGameProps = {
   players: Player[];
 };
 
-// Durées rapides et dynamiques !
+// Durées dynamiques et optimisées
 const GET_DURATION = (type: string) => {
-  if (type === "true_false") return 5;
-  if (type === "qcm") return 10;
-  return 15; // Estimation et Ouverte
+  if (type === "true_false") return 8; 
+  if (type === "qcm") return 12;
+  return 15; // Estimation
 };
+
+const REVEAL_DURATION = 6; // 6 secondes pour lire la bonne réponse sans frustration
 
 export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, players }: QuizGameProps) {
   const questions: QuizQuestion[] = roomState?.game_data?.questions || [];
@@ -30,32 +32,34 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const currentQuestion = questions[currentIndex];
 
   const [timeLeft, setTimeLeft] = useState(15);
+  const [revealTimeLeft, setRevealTimeLeft] = useState(REVEAL_DURATION);
   const [phase, setPhase] = useState<"question" | "reveal">("question");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inputValue, setInputValue] = useState("");
 
-  // 1. NOUVELLE QUESTION : On réinitialise
+  // 1. NOUVELLE QUESTION : On remet tout à zéro
   useEffect(() => {
     if (gameState !== "playing" || !currentQuestion) return;
     setPhase("question");
     setTimeLeft(GET_DURATION(currentQuestion.type));
+    setRevealTimeLeft(REVEAL_DURATION);
+    setInputValue("");
   }, [currentIndex, currentQuestion, gameState]);
 
-  // 2. VÉRIFICATION AUTO-SKIP (La Magie !)
+  // 2. VÉRIFICATION AUTO-SKIP (Si tous les joueurs ont cliqué)
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount > 0 && answeredCount >= players.length;
   const myAnswer = answers[myPlayerId] || null;
 
   useEffect(() => {
-    // Dès que le dernier joueur a cliqué, on coupe le chrono instantanément !
     if (allAnswered && phase === "question" && gameState === "playing") {
       setPhase("reveal");
       setTimeLeft(0);
     }
   }, [allAnswered, phase, gameState]);
 
-  // 3. LE CHRONOMÈTRE
+  // 3. CHRONO DE LA QUESTION
   useEffect(() => {
-    // Si tout le monde a répondu, on arrête de faire tourner le chrono
     if (phase !== "question" || gameState !== "playing" || allAnswered) return;
 
     const timer = setInterval(() => {
@@ -72,39 +76,48 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     return () => clearInterval(timer);
   }, [phase, gameState, allAnswered]);
 
-  // 4. LE PASSAGE AUTO À LA SUITE (Géré par l'hôte)
+  // 4. CHRONO DE TRANSITION (Le fameux délai réparé !)
   useEffect(() => {
-    if (phase === "reveal" && isHost && gameState === "playing") {
-      const transitionTimer = setTimeout(async () => {
-        const nextIdx = currentIndex + 1;
-        if (nextIdx >= questions.length) {
-          await endGameRemote(roomCode);
-        } else {
-          // On passe à la suivante et on informe la DB qu'on doit garder les questions actuelles
-          await nextQuestionRemote(roomCode, nextIdx, questions);
+    if (phase !== "reveal" || gameState !== "playing") return;
+
+    const timer = setInterval(() => {
+      setRevealTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          
+          // Seul l'hôte donne l'ordre de passer à la suite (pour éviter les doublons)
+          if (isHost) {
+            const nextIdx = currentIndex + 1;
+            if (nextIdx >= questions.length) {
+              endGameRemote(roomCode);
+            } else {
+              nextQuestionRemote(roomCode, nextIdx, questions);
+            }
+          }
+          return 0;
         }
-      }, 4000); // 4 petites secondes de révélation
+        return prev - 1;
+      });
+    }, 1000);
 
-      return () => clearTimeout(transitionTimer);
-    }
-  }, [phase, isHost, currentIndex, questions.length, roomCode, gameState, questions]);
+    return () => clearInterval(timer);
+  }, [phase, gameState, isHost, currentIndex, questions, roomCode]);
 
 
-  // 5. ENVOI DE LA RÉPONSE VERS LA BASE DE DONNÉES
-  const handleAnswerClick = async (answer: string) => {
-    if (myAnswer !== null || phase !== "question" || isSubmitting) return;
-    setIsSubmitting(true);
+  // 5. ENVOI DE LA RÉPONSE (Textes ou Boutons)
+  const handleAnswerClick = async (answer: string | number) => {
+    const answerStr = String(answer).trim();
+    if (myAnswer !== null || phase !== "question" || isSubmitting || !answerStr) return;
     
+    setIsSubmitting(true);
     const supabase = getSupabaseBrowser();
     if (supabase) {
-      // On va chercher les réponses actuelles pour ajouter la nôtre
       const { data } = await supabase.from("rooms").select("game_data").eq("code", roomCode).single();
       const gameData = data?.game_data || {};
       const currentAnswers = gameData.answers || {};
       
-      currentAnswers[myPlayerId] = answer;
+      currentAnswers[myPlayerId] = answerStr;
       
-      // On renvoie le tout mis à jour !
       await supabase.from("rooms").update({ 
         game_data: { ...gameData, answers: currentAnswers } 
       }).eq("code", roomCode);
@@ -126,7 +139,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           
           <ul className="flex flex-col gap-3 mb-8">
             {players.map((p, i) => (
-              <li key={p.id} className="bg-slate-100 py-3 px-4 rounded-xl font-bold text-slate-800 text-lg flex justify-between items-center">
+              <li key={p.id} className="bg-white py-3 px-4 rounded-xl font-bold text-slate-800 text-lg flex justify-between items-center shadow-sm border border-slate-100">
                 <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👏"} {p.name}</span>
                 <span className="text-violet-600">0 pts</span>
               </li>
@@ -134,7 +147,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           </ul>
 
           {isHost ? (
-            <button onClick={handleReturnLobby} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition">
+            <button onClick={handleReturnLobby} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition shadow-lg">
               Retour au Salon
             </button>
           ) : (
@@ -148,6 +161,8 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   if (!currentQuestion) return <div className="text-center p-8 text-slate-500 font-bold">Chargement...</div>;
 
   const duration = GET_DURATION(currentQuestion.type);
+  const isTextBased = currentQuestion.type === "estimation" || currentQuestion.type === "open";
+  const isEstimation = currentQuestion.type === "estimation";
 
   return (
     <div className="flex flex-1 flex-col items-center w-full max-w-md mx-auto">
@@ -186,52 +201,81 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         </h2>
       </motion.div>
 
-      {/* LES RÉPONSES */}
+      {/* ZONE DE RÉPONSES */}
       <div className="w-full flex-1 flex flex-col gap-3">
-        {(currentQuestion.type === "qcm" || currentQuestion.type === "true_false") && currentQuestion.options ? (
-          <div className="grid grid-cols-1 gap-3">
-            {currentQuestion.options.map((option, i) => {
-              const isSelected = myAnswer === option;
-              
-              let revealClass = "bg-white text-slate-700 border-slate-100/50";
-              if (phase === "reveal") {
-                if (option === currentQuestion.answer) revealClass = "bg-green-500 text-white shadow-green-500/50 scale-[1.02] border-green-400";
-                else if (isSelected) revealClass = "bg-red-500 text-white shadow-red-500/50 opacity-80 border-red-400";
-                else revealClass = "bg-slate-100 text-slate-400 opacity-40 border-slate-100";
-              } else if (isSelected) {
-                revealClass = "bg-violet-600 text-white shadow-violet-500/50 ring-4 ring-violet-200 border-violet-500";
-              }
+        
+        {/* CAS 1 : C'est une question de Texte/Estimation */}
+        {isTextBased ? (
+          <div className="flex-1 flex flex-col gap-4 w-full">
+            <input
+              type="text"
+              inputMode={isEstimation ? "numeric" : "text"}
+              pattern={isEstimation ? "[0-9]*" : undefined}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              disabled={myAnswer !== null || phase !== "question"}
+              placeholder={isEstimation ? "Entre un nombre..." : "Ta réponse..."}
+              className="w-full text-center text-3xl font-bold py-6 rounded-2xl border-none shadow-inner bg-white/90 focus:ring-4 focus:ring-violet-400 outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={() => handleAnswerClick(inputValue)}
+              disabled={myAnswer !== null || phase !== "question" || inputValue.trim() === ""}
+              className="w-full py-5 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xl shadow-lg disabled:opacity-50 transition hover:scale-[1.02] active:scale-95"
+            >
+              {myAnswer !== null ? "Réponse envoyée ✅" : "Valider"}
+            </button>
 
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleAnswerClick(option)}
-                  disabled={myAnswer !== null || phase !== "question"}
-                  className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${myAnswer === null && phase === "question" ? "hover:scale-[1.02] active:scale-95 hover:shadow-md cursor-pointer" : "cursor-default"}`}
-                >
-                  {option}
-                </button>
-              );
-            })}
+            {/* Révélation spéciale pour l'estimation */}
+            {phase === "reveal" && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-6 rounded-2xl bg-white/90 shadow-md text-center">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">La bonne réponse</p>
+                <p className="text-4xl font-black text-green-500">{currentQuestion.answer}</p>
+                <div className="h-px w-full bg-slate-200 my-4"></div>
+                <p className="text-sm font-bold text-slate-500">Ton choix : <span className={myAnswer == currentQuestion.answer ? "text-green-500" : "text-red-500"}>{myAnswer || "Rien"}</span></p>
+              </motion.div>
+            )}
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white/50 rounded-3xl border-2 border-dashed border-slate-300 p-6 text-center">
-             <span className="text-4xl mb-2">🔢</span>
-             <p className="text-slate-500 font-bold">L'écran pour taper un chiffre arrive très bientôt !</p>
-          </div>
+          
+          /* CAS 2 : C'est un QCM ou Vrai/Faux */
+          currentQuestion.options?.map((option, i) => {
+            const isSelected = myAnswer === option;
+            let revealClass = "bg-white text-slate-700 border-slate-100/50";
+            
+            if (phase === "reveal") {
+              if (option === currentQuestion.answer) revealClass = "bg-green-500 text-white shadow-green-500/50 scale-[1.02] border-green-400";
+              else if (isSelected) revealClass = "bg-red-500 text-white shadow-red-500/50 opacity-80 border-red-400";
+              else revealClass = "bg-slate-100 text-slate-400 opacity-40 border-slate-100";
+            } else if (isSelected) {
+              revealClass = "bg-violet-600 text-white shadow-violet-500/50 ring-4 ring-violet-200 border-violet-500";
+            }
+
+            return (
+              <button
+                key={i}
+                onClick={() => handleAnswerClick(option)}
+                disabled={myAnswer !== null || phase !== "question"}
+                className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${myAnswer === null && phase === "question" ? "hover:scale-[1.02] active:scale-95 hover:shadow-md cursor-pointer" : "cursor-default"}`}
+              >
+                {option}
+              </button>
+            );
+          })
         )}
 
-        {/* --- NOUVEAU : LE COMPTEUR DE RÉPONSES --- */}
-        {phase === "question" && (
-          <p className="text-center font-bold mt-4 text-sm text-slate-500 animate-pulse">
-            {myAnswer 
-              ? `En attente des autres... (${answeredCount}/${players.length})` 
-              : `Réponses : ${answeredCount}/${players.length}`}
+        {/* --- LE COMPTEUR DE RÉPONSES ET LE CHRONO DE SUITE --- */}
+        {phase === "question" ? (
+          <p className="text-center font-bold mt-4 text-sm text-slate-500">
+            {myAnswer ? "En attente des autres..." : "À toi de jouer !"} 
+            <span className="ml-2 bg-slate-200 px-2 py-1 rounded-md text-slate-700">{answeredCount}/{players.length}</span>
           </p>
+        ) : (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center font-bold mt-4 text-sm text-slate-500 animate-pulse">
+            Prochaine question dans {revealTimeLeft}...
+          </motion.p>
         )}
 
       </div>
-
     </div>
   );
 }
