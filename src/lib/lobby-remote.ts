@@ -2,7 +2,6 @@ import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 import { getRandomQuestions } from "./quiz-bank";
 
-
 export type { Player };
 
 const MAX_CODE_ATTEMPTS = 40;
@@ -149,7 +148,7 @@ export async function measureSupabasePingMs(): Promise<number | null> {
   return Math.round(t1 - t0);
 }
 
-// --- LA FAMEUSE FONCTION MANQUANTE ---
+// --- MISE À JOUR : On prépare les réponses (answers: {}) au lancement
 export async function startGameRemote(roomCode: string, questionCount: number) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
@@ -160,7 +159,7 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
     .from("rooms")
     .update({
       game_state: "playing",
-      game_data: { questions: selectedQuestions },
+      game_data: { questions: selectedQuestions, answers: {} },
       current_question_index: 0
     })
     .eq("code", roomCode);
@@ -169,13 +168,17 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
   return { ok: true };
 }
 
-export async function nextQuestionRemote(roomCode: string, nextIndex: number) {
+// --- MISE À JOUR : On passe à la question suivante ET on vide les réponses
+export async function nextQuestionRemote(roomCode: string, nextIndex: number, currentQuestions: any[]) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
   const { error } = await supabase
     .from("rooms")
-    .update({ current_question_index: nextIndex })
+    .update({ 
+      current_question_index: nextIndex,
+      game_data: { questions: currentQuestions, answers: {} }
+    })
     .eq("code", roomCode);
 
   return { ok: !error };
