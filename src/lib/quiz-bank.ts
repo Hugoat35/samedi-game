@@ -39,7 +39,41 @@ export function buildGeoShapeUrl(countryCode: string): string {
   return `https://cdn.jsdelivr.net/gh/djaiss/mapsicon@master/all/${countryCode.toLowerCase()}/128.png`;
 }
 
-const GEO_FLAG_QUESTIONS: QuizQuestion[] = GEO_FLAG_ROWS.map((r, i) => ({
+/** ~10 % de questions drapeau / silhouette en moins dans la banque (probabilité d’apparition réduite). */
+const GEO_IN_POOL_RATIO = 0.9;
+
+/** Points affichés + attribués au Tribunal par case acceptée (aligné sur `MINIBAC_POINTS_PER_CELL` dans lobby-remote). */
+const MINIBAC_POINTS_PER_VALIDATED_CELL = 20;
+
+/** Entier uniforme dans [0, n) — préfère crypto pour un tirage moins prévisible. */
+function randomIntBelow(n: number): number {
+  if (n <= 0) return 0;
+  if (typeof globalThis.crypto !== "undefined" && globalThis.crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(buf);
+    return buf[0]! % n;
+  }
+  return Math.floor(Math.random() * n);
+}
+
+/** Mélange équitable (Fisher–Yates). */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomIntBelow(i + 1);
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
+}
+
+function sampleGeoRows<T>(rows: T[], keepRatio: number): T[] {
+  if (rows.length === 0) return [];
+  const shuffled = shuffle([...rows]);
+  const n = Math.max(1, Math.floor(rows.length * keepRatio));
+  return shuffled.slice(0, Math.min(n, rows.length));
+}
+
+const GEO_FLAG_QUESTIONS: QuizQuestion[] = sampleGeoRows(GEO_FLAG_ROWS, GEO_IN_POOL_RATIO).map((r, i) => ({
   id: `gf-${i}-${r.code}`,
   type: "geo_flag",
   question: "Quel pays correspond à ce drapeau ?",
@@ -49,7 +83,7 @@ const GEO_FLAG_QUESTIONS: QuizQuestion[] = GEO_FLAG_ROWS.map((r, i) => ({
   points: 120,
 }));
 
-const GEO_SHAPE_QUESTIONS: QuizQuestion[] = GEO_SHAPE_ROWS.map((r, i) => ({
+const GEO_SHAPE_QUESTIONS: QuizQuestion[] = sampleGeoRows(GEO_SHAPE_ROWS, GEO_IN_POOL_RATIO).map((r, i) => ({
   id: `gs-${i}-${r.code}`,
   type: "geo_shape",
   question: "À quel pays correspond cette forme ?",
@@ -277,27 +311,6 @@ export const QUIZ_BANK: QuizQuestion[] = [
   ...GEO_SHAPE_QUESTIONS,
 ];
 
-/** Entier uniforme dans [0, n) — préfère crypto pour un tirage moins prévisible. */
-function randomIntBelow(n: number): number {
-  if (n <= 0) return 0;
-  if (typeof globalThis.crypto !== "undefined" && globalThis.crypto.getRandomValues) {
-    const buf = new Uint32Array(1);
-    globalThis.crypto.getRandomValues(buf);
-    return buf[0]! % n;
-  }
-  return Math.floor(Math.random() * n);
-}
-
-/** Mélange équitable (Fisher–Yates) : chaque permutation a la même probabilité. */
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = randomIntBelow(i + 1);
-    [a[i], a[j]] = [a[j]!, a[i]!];
-  }
-  return a;
-}
-
 // --- GÉNÉRATEUR DYNAMIQUE DE QUESTIONS ---
 /** Tirage uniforme sans remise : chaque entrée de la banque a la même probabilité (géo ou non). */
 export function getRandomQuestions(count: number): QuizQuestion[] {
@@ -317,7 +330,7 @@ export function getRandomQuestions(count: number): QuizQuestion[] {
         type: "minibac",
         question: `Mini-Bac : Lettre ${randomLetter}`,
         answer: "vote",
-        points: 200,
+        points: MINIBAC_POINTS_PER_VALIDATED_CELL,
         letter: randomLetter,
         categories: shuffledCategories,
       };

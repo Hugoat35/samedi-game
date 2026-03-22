@@ -138,8 +138,8 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const [inputValue, setInputValue] = useState("");
   const [minibacValues, setMinibacValues] = useState(["", "", "", ""]);
 
-  /** Fin de chrono : envoyer ce qui est dans les champs (sans exiger « Valider »). */
-  const autoSubmitBeforeRevealRef = useRef<() => void>(() => {});
+  /** Fin de chrono : envoyer ce qui est dans les champs (sans exiger « Valider »). Doit être await avant reveal. */
+  const autoSubmitBeforeRevealRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!currentQuestion?.id) return;
@@ -166,7 +166,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const effectiveChoice = localAnswer ?? myAnswer;
   const hasLockedAnswer = localSubmitted || myAnswer !== null || localAnswer !== null;
 
-  autoSubmitBeforeRevealRef.current = () => {
+  autoSubmitBeforeRevealRef.current = async () => {
     if (!currentQuestion) return;
     if (phase !== "question" || gameState !== "playing") return;
     if (localSubmitted || myAnswer !== null || localAnswer !== null) return;
@@ -177,14 +177,13 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       const values = minibacValues.map((v) => String(v).trim());
       setLocalSubmitted(true);
       const minibac: MinibacSubmission = { letter, categories, values };
-      void submitAnswerRemote(roomCode, myPlayerId, {
+      const res = await submitAnswerRemote(roomCode, myPlayerId, {
         questionId: currentQuestion.id,
         questionType: "minibac",
         answerStr: JSON.stringify({ type: "minibac", letter, categories, values }),
         minibac,
-      }).then((res) => {
-        if (!res.ok) setLocalSubmitted(false);
       });
+      if (!res.ok) setLocalSubmitted(false);
       return;
     }
 
@@ -197,13 +196,12 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     ) {
       const raw = inputValue.trim();
       setLocalSubmitted(true);
-      void submitAnswerRemote(roomCode, myPlayerId, {
+      const res = await submitAnswerRemote(roomCode, myPlayerId, {
         questionId: currentQuestion.id,
         questionType: currentQuestion.type,
         answerStr: raw,
-      }).then((res) => {
-        if (!res.ok) setLocalSubmitted(false);
       });
+      if (!res.ok) setLocalSubmitted(false);
     }
   };
 
@@ -220,8 +218,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          autoSubmitBeforeRevealRef.current();
-          setPhase("reveal");
+          void (async () => {
+            await autoSubmitBeforeRevealRef.current();
+            setPhase("reveal");
+          })();
           return 0;
         }
         return prev - 1;

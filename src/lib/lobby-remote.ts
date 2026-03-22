@@ -353,24 +353,38 @@ export async function submitAnswerRemote(
       ? (payload.minibac as unknown as Record<string, unknown>)
       : null;
 
-  const { error: rpcError } = await supabase.rpc("merge_room_answer", {
-    p_code: roomCode.trim(),
-    p_player_id: playerId,
-    p_question_id: payload.questionId,
-    p_question_type: payload.questionType,
-    p_answer_str: answerStrStored,
-    p_minibac: minibacJson,
-  });
+  let lastError = "Impossible d'enregistrer la réponse.";
 
-  if (rpcError && shouldFallbackToLegacyRpc(rpcError)) {
-    return submitAnswerRemoteLegacy(roomCode, playerId, payload);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt - 1)));
+    }
+
+    const { error: rpcError } = await supabase.rpc("merge_room_answer", {
+      p_code: roomCode.trim(),
+      p_player_id: playerId,
+      p_question_id: payload.questionId,
+      p_question_type: payload.questionType,
+      p_answer_str: answerStrStored,
+      p_minibac: minibacJson,
+    });
+
+    if (rpcError && shouldFallbackToLegacyRpc(rpcError)) {
+      const leg = await submitAnswerRemoteLegacy(roomCode, playerId, payload);
+      if (leg.ok) return leg;
+      lastError = leg.error;
+      continue;
+    }
+
+    if (rpcError) {
+      lastError = rpcError.message;
+      continue;
+    }
+
+    return { ok: true };
   }
 
-  if (rpcError) {
-    return { ok: false, error: rpcError.message };
-  }
-
-  return { ok: true };
+  return { ok: false, error: lastError };
 }
 
 export async function startGameRemote(roomCode: string, questionCount: number) {
@@ -470,7 +484,7 @@ export async function endGameRemote(
   return { ok: !error };
 }
 
-/** Points attribués par réponse acceptée au Tribunal (une case du Mini-Bac). */
+/** Points par case acceptée au Tribunal — doit rester aligné avec `MINIBAC_POINTS_PER_VALIDATED_CELL` dans quiz-bank. */
 export const MINIBAC_POINTS_PER_CELL = 20;
 
 export function buildTribunalCellVoteKey(
