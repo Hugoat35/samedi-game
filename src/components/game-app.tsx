@@ -5,8 +5,25 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { useLobbyPlayers } from "@/hooks/use-lobby-players";
 import { useRoomState } from "@/hooks/use-room-state";
 import { isSupabaseConfigured } from "@/lib/env";
-import { createRoomRemote, joinRoomRemote, leaveRoomRemote, startGameRemote } from "@/lib/lobby-remote";
+import {
+  createRoomRemote,
+  fetchPlayersRemote,
+  fetchRoomByCode,
+  joinRoomRemote,
+  leaveRoomRemote,
+  reconnectPlayerRemote,
+  startGameRemote,
+} from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
+import {
+  clearReconnectOffer,
+  clearSession,
+  loadReconnectOffer,
+  loadSession,
+  saveReconnectOffer,
+  saveSession,
+  type StoredSession,
+} from "@/lib/local-session";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
@@ -15,7 +32,6 @@ import QuizGame from "@/components/quiz-game";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
-const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
   animate: { opacity: 1, y: 0, filter: "blur(0px)" },
@@ -42,9 +58,15 @@ export default function GameApp() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(5);
   const [startError, setStartError] = useState<string | null>(null);
+  const [sessionRestoring, setSessionRestoring] = useState(() => remote);
+  const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
+  const [playerDepartedNotice, setPlayerDepartedNotice] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const refreshRoomStateRef = useRef<(code?: string | null) => Promise<void>>(async () => {});
+  const prevRemotePlayersRef = useRef<Player[]>([]);
   const { roomState, refreshRoomState } = useRoomState(roomCode);
+  refreshRoomStateRef.current = refreshRoomState;
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,11 +104,14 @@ export default function GameApp() {
     setJoinError(null);
     setBusy(false);
     setSelectedGame(null);
+    clearSession();
+    clearReconnectOffer();
+    setReconnectOffer(null);
   }, []);
 
   const { players: remotePlayers } = useLobbyPlayers(
     roomCode,
-    Boolean(remote && view !== "home" && view !== "join" && view !== "create"),
+    Boolean(remote && !sessionRestoring && view !== "home" && view !== "join" && view !== "create"),
     remote ? { isHost, onRoomClosedByHost: handleKickedByHost } : undefined,
   );
 
@@ -95,6 +120,112 @@ export default function GameApp() {
     if (roomState?.game_state === "playing" && view === "lobby") setView("playing");
     if (roomState?.game_state === "lobby" && view === "playing") setView("lobby");
   }, [roomState?.game_state, view]);
+
+  // Restauration session (rafraîchissement page) + offre « reprendre » si la partie tourne encore
+  useEffect(() => {
+    if (!remote) {
+      setSessionRestoring(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const session = loadSession();
+      if (session) {
+        const roomRes = await fetchRoomByCode(session.roomCode);
+        if (cancelled) return;
+        if (!roomRes.ok) {
+          clearSession();
+        } else {
+          const room = roomRes.room;
+          const gameState = room.game_state as string | undefined;
+          const playersRes = await fetchPlayersRemote(session.roomCode);
+          const inLobby =
+            playersRes.ok && playersRes.players.some((p) => p.id === session.playerId);
+
+          if (inLobby) {
+            setRoomCode(session.roomCode);
+            setMyPlayerId(session.playerId);
+            setIsHost(session.isHost);
+            setPseudo(session.displayName);
+            setAvatar(session.avatar);
+            setSelectedGame("culture-quiz");
+            await refreshRoomStateRef.current(session.roomCode);
+            if (cancelled) return;
+            setView(gameState === "playing" ? "playing" : "lobby");
+            setSessionRestoring(false);
+            return;
+          }
+
+          const scores = (room.game_data as { scores?: Record<string, number> } | undefined)?.scores ?? {};
+          if (gameState === "playing" && scores[session.playerId] != null) {
+            const res = await reconnectPlayerRemote(
+              session.roomCode,
+              session.playerId,
+              session.displayName,
+              session.avatar ?? "",
+            );
+            if (cancelled) return;
+            if (res.ok) {
+              setRoomCode(session.roomCode);
+              setMyPlayerId(session.playerId);
+              setIsHost(session.isHost);
+              setPseudo(session.displayName);
+              setAvatar(session.avatar);
+              setSelectedGame("culture-quiz");
+              await refreshRoomStateRef.current(session.roomCode);
+              setView("playing");
+              setSessionRestoring(false);
+              return;
+            }
+          }
+          clearSession();
+        }
+      }
+
+      if (cancelled) return;
+      setSessionRestoring(false);
+
+      const offer = loadReconnectOffer();
+      if (!offer) return;
+      const check = await fetchRoomByCode(offer.roomCode);
+      if (cancelled) return;
+      if (check.ok && (check.room.game_state as string) === "playing") {
+        setReconnectOffer(offer);
+      } else {
+        clearReconnectOffer();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [remote]);
+
+  useEffect(() => {
+    if (!remote || view !== "playing") {
+      if (view !== "playing") prevRemotePlayersRef.current = [];
+      return;
+    }
+    const prev = prevRemotePlayersRef.current;
+    const next = remotePlayers;
+    if (prev.length === 0) {
+      prevRemotePlayersRef.current = next;
+      return;
+    }
+    const nextIds = new Set(next.map((p: Player) => p.id));
+    const departed = prev.filter((p: Player) => !nextIds.has(p.id));
+    if (departed.length > 0 && myPlayerId) {
+      const others = departed.filter((p: Player) => p.id !== myPlayerId);
+      if (others.length > 0) {
+        const msg =
+          others.length === 1
+            ? `${others[0].name} a quitté la partie.`
+            : `${others.map((p) => p.name).join(", ")} ont quitté la partie.`;
+        setPlayerDepartedNotice(msg);
+        window.setTimeout(() => setPlayerDepartedNotice(null), 9000);
+      }
+    }
+    prevRemotePlayersRef.current = next;
+  }, [remote, view, remotePlayers, myPlayerId]);
 
   useEffect(() => {
     if (!remote || !roomCode || !myPlayerId || view === "home") return;
@@ -116,7 +247,20 @@ export default function GameApp() {
 
   const goHome = useCallback(async () => {
     setJoinError(null);
+    let savedReconnectPayload: StoredSession | null = null;
     if (roomCode && myPlayerId) {
+      const wasPlaying = roomState?.game_state === "playing";
+      if (remote && wasPlaying && !isHost) {
+        savedReconnectPayload = {
+          v: 1,
+          roomCode,
+          playerId: myPlayerId,
+          isHost,
+          displayName: pseudo.trim() || "Joueur",
+          avatar,
+        };
+        saveReconnectOffer(savedReconnectPayload);
+      }
       setIsLeavingRoom(true);
       if (remote) {
         setBusy(true);
@@ -143,7 +287,14 @@ export default function GameApp() {
     setPseudo("");
     setAvatar(null);
     setSelectedGame(null);
-  }, [remote, roomCode, myPlayerId, isHost]);
+    clearSession();
+    if (savedReconnectPayload) {
+      setReconnectOffer(savedReconnectPayload);
+    } else {
+      clearReconnectOffer();
+      setReconnectOffer(null);
+    }
+  }, [remote, roomCode, myPlayerId, isHost, roomState?.game_state, pseudo, avatar]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +328,16 @@ export default function GameApp() {
       const result = await joinRoomRemote(pin, pseudo.trim() || "Anonyme", avatar || "");
       setBusy(false);
       if (result.ok) {
+        clearReconnectOffer();
+        setReconnectOffer(null);
+        saveSession({
+          v: 1,
+          roomCode: result.code,
+          playerId: result.myPlayerId,
+          isHost: false,
+          displayName: pseudo.trim() || "Anonyme",
+          avatar,
+        });
         setRoomCode(result.code);
         setMyPlayerId(result.myPlayerId);
         setIsHost(false);
@@ -215,6 +376,50 @@ export default function GameApp() {
     }
   };
 
+  const handleReconnectToGame = useCallback(async () => {
+    if (!reconnectOffer || !remote) return;
+    setBusy(true);
+    setJoinError(null);
+    const offer = reconnectOffer;
+    const r = await reconnectPlayerRemote(
+      offer.roomCode,
+      offer.playerId,
+      offer.displayName,
+      offer.avatar ?? "",
+    );
+    setBusy(false);
+    if (!r.ok) {
+      setJoinError(r.error);
+      clearReconnectOffer();
+      setReconnectOffer(null);
+      return;
+    }
+    clearReconnectOffer();
+    saveSession(offer);
+    setReconnectOffer(null);
+    setRoomCode(offer.roomCode);
+    setMyPlayerId(offer.playerId);
+    setIsHost(offer.isHost);
+    setPseudo(offer.displayName);
+    setAvatar(offer.avatar);
+    setSelectedGame("culture-quiz");
+    await refreshRoomState(offer.roomCode);
+    setView("playing");
+  }, [reconnectOffer, remote, refreshRoomState]);
+
+  const handleDismissReconnect = useCallback(() => {
+    clearReconnectOffer();
+    setReconnectOffer(null);
+  }, []);
+
+  if (remote && sessionRestoring) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[var(--app-bg)] px-6">
+        <p className="text-center text-sm font-semibold text-slate-600">Chargement de la session…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--app-bg)] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
       <header className="relative z-10 mb-3 flex shrink-0 items-center justify-between gap-3 sm:mb-6">
@@ -246,15 +451,51 @@ export default function GameApp() {
               className="flex min-h-0 flex-1 flex-col justify-center gap-3 py-2 sm:gap-4 sm:py-0"
               {...pageTransition}
             >
+              {reconnectOffer && (
+                <div className="rounded-2xl border border-amber-200/80 bg-amber-50/95 px-4 py-3 shadow-sm sm:rounded-[1.75rem] sm:px-5 sm:py-4">
+                  <p className="text-center text-xs font-semibold text-amber-900 sm:text-sm">
+                    Une partie est toujours en cours sur la salle{" "}
+                    <span className="font-mono tabular-nums">{reconnectOffer.roomCode}</span>. Tu peux reprendre ta place
+                    (même joueur, score conservé côté serveur).
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleReconnectToGame()}
+                      className="flex min-h-[2.75rem] w-full items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50 sm:min-h-12 sm:w-auto sm:min-w-[200px] sm:rounded-2xl sm:text-base"
+                    >
+                      {busy ? "Connexion…" : "Reprendre la partie"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleDismissReconnect}
+                      className="rounded-xl py-2 text-center text-xs font-semibold text-amber-800/90 underline-offset-2 hover:underline sm:py-2.5 sm:text-sm"
+                    >
+                      Ignorer
+                    </button>
+                  </div>
+                </div>
+              )}
+              {joinError && (
+                <p className="text-center text-xs font-medium text-red-600 sm:text-sm">{joinError}</p>
+              )}
               <button
-                onClick={() => setView("create")}
+                onClick={() => {
+                  setJoinError(null);
+                  setView("create");
+                }}
                 disabled={busy}
                 className="flex min-h-[3.5rem] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 text-base font-semibold text-white shadow-md transition hover:brightness-105 sm:min-h-[4.25rem] sm:rounded-[1.75rem] sm:text-lg"
               >
                 Créer une partie
               </button>
               <button
-                onClick={() => setView("join")}
+                onClick={() => {
+                  setJoinError(null);
+                  setView("join");
+                }}
                 disabled={busy}
                 className="flex min-h-[3.5rem] w-full items-center justify-center rounded-2xl bg-white/90 px-5 text-base font-semibold text-slate-800 shadow-sm transition hover:bg-white sm:min-h-[4.25rem] sm:rounded-[1.75rem] sm:text-lg"
               >
@@ -497,13 +738,21 @@ export default function GameApp() {
 
           {/* C'EST ICI QU'ON APPELLE TON NOUVEAU COMPOSANT DE JEU */}
           {view === "playing" && roomState && roomCode && myPlayerId && (
-            <motion.section key="playing" className="flex min-h-0 flex-1 flex-col" {...pageTransition}>
-              <QuizGame 
-                roomCode={roomCode} 
-                roomState={roomState} 
-                myPlayerId={myPlayerId} 
-                isHost={isHost} 
-                players={players} 
+            <motion.section key="playing" className="flex min-h-0 flex-1 flex-col gap-2" {...pageTransition}>
+              {playerDepartedNotice && (
+                <div
+                  role="status"
+                  className="shrink-0 rounded-xl border border-amber-200/90 bg-amber-50 px-3 py-2.5 text-center text-xs font-semibold text-amber-950 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                >
+                  {playerDepartedNotice}
+                </div>
+              )}
+              <QuizGame
+                roomCode={roomCode}
+                roomState={roomState}
+                myPlayerId={myPlayerId}
+                isHost={isHost}
+                players={players}
               />
             </motion.section>
           )}

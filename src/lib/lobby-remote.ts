@@ -138,6 +138,69 @@ export async function fetchPlayersRemote(roomCode: string): Promise<
   };
 }
 
+export async function fetchRoomByCode(
+  roomCode: string,
+): Promise<{ ok: true; room: Record<string, unknown> } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("code", roomCode.trim())
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Salle introuvable." };
+  return { ok: true, room: data as Record<string, unknown> };
+}
+
+/**
+ * Réinsère un joueur avec le même UUID (scores conservés dans game_data) si la ligne avait été supprimée.
+ */
+export async function reconnectPlayerRemote(
+  roomCode: string,
+  playerId: string,
+  displayName: string,
+  avatar: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const code = roomCode.trim();
+  const { data: room, error: roomErr } = await supabase
+    .from("rooms")
+    .select("game_state")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (roomErr) return { ok: false, error: roomErr.message };
+  if (!room) return { ok: false, error: "Cette salle n’existe plus." };
+
+  const gameState = (room as { game_state?: string }).game_state;
+  if (gameState !== "playing") {
+    return { ok: false, error: "La partie n’est plus en cours." };
+  }
+
+  const { data: existing } = await supabase
+    .from("lobby_players")
+    .select("id")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (existing) return { ok: true };
+
+  const { error: insErr } = await supabase.from("lobby_players").insert({
+    id: playerId,
+    room_code: code,
+    display_name: displayName,
+    avatar: avatar || null,
+  });
+
+  if (insErr) return { ok: false, error: insErr.message };
+  return { ok: true };
+}
+
 export async function measureSupabasePingMs(): Promise<number | null> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return null;

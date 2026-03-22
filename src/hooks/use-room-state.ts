@@ -6,11 +6,12 @@ import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 export function useRoomState(roomCode: string | null) {
   const [roomState, setRoomState] = useState<any>(null);
 
-  const refreshRoomState = useCallback(async () => {
-    if (!roomCode) return;
+  const refreshRoomState = useCallback(async (codeOverride?: string | null) => {
+    const code = (codeOverride ?? roomCode)?.trim();
+    if (!code) return;
     const supabase = getSupabaseBrowser();
     if (!supabase) return;
-    const { data } = await supabase.from("rooms").select("*").eq("code", roomCode.trim()).single();
+    const { data } = await supabase.from("rooms").select("*").eq("code", code).single();
     if (data) setRoomState(data);
   }, [roomCode]);
 
