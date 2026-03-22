@@ -2,6 +2,7 @@ import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 import { getRandomQuestions } from "./quiz-bank";
 
+
 export type { Player };
 
 const MAX_CODE_ATTEMPTS = 40;
@@ -139,18 +140,22 @@ export async function fetchPlayersRemote(roomCode: string): Promise<
 }
 
 export async function measureSupabasePingMs(): Promise<number | null> {
-  // ... inchangé
-  return null; 
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return null;
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const { error } = await supabase.from("rooms").select("id").limit(1);
+  const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (error) return null;
+  return Math.round(t1 - t0);
 }
 
+// --- LA FAMEUSE FONCTION MANQUANTE ---
 export async function startGameRemote(roomCode: string, questionCount: number) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  // L'hôte pioche les questions en local...
   const selectedQuestions = getRandomQuestions(questionCount);
 
-  // ... et les envoie sur Supabase pour que tout le monde ait les mêmes !
   const { error } = await supabase
     .from("rooms")
     .update({

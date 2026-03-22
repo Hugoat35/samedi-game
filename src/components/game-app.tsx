@@ -33,12 +33,16 @@ export default function GameApp() {
   const [isHost, setIsHost] = useState(false);
   const [isLeavingRoom, setIsLeavingRoom] = useState(false);
   
-  // Nouveaux états pour le jeu
+  // États pour le profil et le jeu
   const [pseudo, setPseudo] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
-  const [questionCount, setQuestionCount] = useState(10); // Curseur de l'hôte
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // --- NOUVEAUX ÉTATS POUR LE MENU DE JEU ---
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [questionCount, setQuestionCount] = useState(10);
+  const [startError, setStartError] = useState<string | null>(null); // Pour afficher l'erreur si Supabase bloque
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const roomState = useRoomState(roomCode);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,21 +80,23 @@ export default function GameApp() {
     setPin("");
     setJoinError(null);
     setBusy(false);
+    setSelectedGame(null);
   }, []);
 
-  const { players: remotePlayers, loading: remoteLoading } = useLobbyPlayers(
+  const { players: remotePlayers } = useLobbyPlayers(
     roomCode,
     Boolean(remote && view !== "home" && view !== "join" && view !== "create"),
     remote ? { isHost, onRoomClosedByHost: handleKickedByHost } : undefined,
   );
 
-  // --- NOUVEAU : ÉCOUTER LE LANCEMENT DU JEU ---
+  // ÉCOUTER LE LANCEMENT DU JEU
   useEffect(() => {
     if (roomState?.game_state === "playing" && view === "lobby") {
       setView("playing");
     }
   }, [roomState?.game_state, view]);
 
+  // DÉCONNEXION SI ON FERME L'ONGLET
   useEffect(() => {
     if (!remote || !roomCode || !myPlayerId || view === "home") return;
     const handleBeforeUnload = () => {
@@ -137,6 +143,7 @@ export default function GameApp() {
     setPin("");
     setPseudo("");
     setAvatar(null);
+    setSelectedGame(null);
   }, [remote, roomCode, myPlayerId, isHost]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -193,10 +200,16 @@ export default function GameApp() {
   };
 
   const handleStartGame = async () => {
+    setStartError(null);
     if (remote && roomCode) {
       setBusy(true);
-      await startGameRemote(roomCode, questionCount);
+      const result = await startGameRemote(roomCode, questionCount);
       setBusy(false);
+      
+      // Si Supabase bloque, on affiche l'erreur en rouge
+      if (!result.ok) {
+        setStartError(result.error ?? null);
+      }
     }
   };
 
@@ -243,9 +256,6 @@ export default function GameApp() {
                     ) : (
                       <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Optionnel)</span>
                     )}
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
-                      <span className="text-white text-2xl">📷</span>
-                    </div>
                   </div>
                   <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
 
@@ -329,24 +339,58 @@ export default function GameApp() {
                   </AnimatePresence>
                 </ul>
 
-                {/* --- PANNEAU DE L'HÔTE (Uniquement visible par le créateur) --- */}
+                {/* --- LE HUB : SÉLECTION DU JEU --- */}
                 {isHost ? (
                   <div className="mt-8 border-t border-slate-200/50 pt-6">
-                    <label className="text-sm font-bold text-slate-600 uppercase tracking-wider block text-center mb-2">
-                      Nombre de questions : <span className="text-violet-600 text-lg">{questionCount}</span>
-                    </label>
-                    <input 
-                      type="range" min="5" max="30" step="1" 
-                      value={questionCount} 
-                      onChange={(e) => setQuestionCount(Number(e.target.value))} 
-                      className="w-full accent-violet-600 mb-6" 
-                    />
-                    <button 
-                      onClick={handleStartGame} disabled={busy || players.length < 1} 
-                      className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      {busy ? "Démarrage..." : "LANCER LA PARTIE !"}
-                    </button>
+                    
+                    {!selectedGame ? (
+                      <div className="flex flex-col gap-3 animate-in fade-in">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center mb-2">Choisir un jeu</h3>
+                        
+                        {/* Bouton pour sélectionner "Le Grand Quiz" */}
+                        <button 
+                          onClick={() => setSelectedGame('culture-quiz')}
+                          className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-[2px] transition hover:scale-[1.02] shadow-sm"
+                        >
+                          <div className="flex h-full w-full items-center justify-between rounded-[14px] bg-white px-5 py-4">
+                            <span className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</span>
+                            <span className="text-violet-500 font-bold text-sm">Sélectionner →</span>
+                          </div>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</h3>
+                          <button onClick={() => setSelectedGame(null)} className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition">
+                            Changer
+                          </button>
+                        </div>
+                        
+                        <label className="text-sm font-bold text-slate-600 uppercase tracking-wider block text-center">
+                          Nombre de questions : <span className="text-violet-600 text-xl">{questionCount}</span>
+                        </label>
+                        <input 
+                          type="range" min="5" max="30" step="1" 
+                          value={questionCount} 
+                          onChange={(e) => setQuestionCount(Number(e.target.value))} 
+                          className="w-full accent-violet-600 mb-4" 
+                        />
+                        
+                        {startError && (
+                          <p className="text-center text-sm font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100 mb-2">
+                            {startError}
+                          </p>
+                        )}
+                        
+                        <button 
+                          onClick={handleStartGame} disabled={busy || players.length < 1} 
+                          className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          {busy ? "Démarrage..." : "LANCER LA PARTIE !"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-8 border-t border-slate-200/50 pt-6 text-center">
@@ -357,7 +401,6 @@ export default function GameApp() {
             </motion.section>
           )}
 
-          {/* VUE PLAYING : L'écran de jeu (On fera l'interface complète plus tard !) */}
           {view === "playing" && roomState && (
             <motion.section key="playing" className="flex flex-1 flex-col justify-center items-center text-center bg-white/80 rounded-[2rem] p-6 shadow-sm backdrop-blur-md" {...pageTransition}>
               <h2 className="text-3xl font-bold text-slate-900 mb-2">C'est parti ! 🚀</h2>
