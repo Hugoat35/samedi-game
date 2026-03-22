@@ -332,14 +332,14 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     const allVotersDone = voters.length === 0 || voters.every((v) => votesForGrid[v.id]);
 
     return (
-      <div className="flex flex-1 flex-col items-center justify-center w-full max-w-md mx-auto text-center px-2">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center w-full max-w-md mx-auto px-2 pb-2 text-center">
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 p-8 rounded-[2rem] shadow-lg w-full border border-violet-100"
+          className="w-full rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-lg sm:rounded-[2rem] sm:p-8"
         >
-          <h2 className="text-3xl font-black text-slate-900 mb-2">⚖️ Le Tribunal</h2>
-          <p className="text-slate-600 mb-2 text-sm font-medium leading-snug">
+          <h2 className="mb-1 text-2xl font-black text-slate-900 sm:mb-2 sm:text-3xl">⚖️ Le Tribunal</h2>
+          <p className="mb-2 text-xs font-medium leading-snug text-slate-600 sm:text-sm">
             Une réponse à la fois : votez pour chaque case.{" "}
             <span className="text-violet-700 font-bold">+{MINIBAC_POINTS_PER_CELL} pts</span> par réponse
             acceptée (majorité).
@@ -375,13 +375,13 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               {myPlayerId === current.playerId ? (
                 <p className="text-slate-500 font-bold animate-pulse">Les autres votent…</p>
               ) : (
-                <div className="flex gap-3 justify-center">
+                <div className="flex justify-center gap-2 sm:gap-3">
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleVote("accept")}
                     disabled={!!votesForGrid[myPlayerId]}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-lg shadow-md transition ${
+                    className={`flex-1 rounded-xl py-3 text-sm font-bold shadow-md transition sm:rounded-2xl sm:py-4 sm:text-lg ${
                       votesForGrid[myPlayerId] === "accept"
                         ? "bg-green-600 text-white"
                         : "bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
@@ -394,7 +394,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleVote("reject")}
                     disabled={!!votesForGrid[myPlayerId]}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-lg shadow-md transition ${
+                    className={`flex-1 rounded-xl py-3 text-sm font-bold shadow-md transition sm:rounded-2xl sm:py-4 sm:text-lg ${
                       votesForGrid[myPlayerId] === "reject"
                         ? "bg-red-700 text-white"
                         : "bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
@@ -406,8 +406,8 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               )}
 
               {isHost && (
-                <div className="mt-8 flex flex-col gap-3">
-                  <p className="text-xs text-slate-400">
+                <div className="mt-5 flex flex-col gap-2 sm:mt-8 sm:gap-3">
+                  <p className="text-[10px] text-slate-400 sm:text-xs">
                     Votes : {Object.keys(votesForGrid).length}/{voters.length}
                     {allVotersDone ? " ✓" : ""}
                   </p>
@@ -416,7 +416,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       type="button"
                       whileTap={{ scale: 0.95 }}
                       onClick={() => advanceTribunalRemote(roomCode)}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg"
+                      className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white sm:rounded-2xl sm:py-4 sm:text-lg"
                     >
                       Réponse suivante
                     </motion.button>
@@ -425,9 +425,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       type="button"
                       whileTap={{ scale: 0.95 }}
                       onClick={() => finishTribunalRemote(roomCode)}
-                      className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-2xl font-bold text-lg"
+                      className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3 text-sm font-bold leading-tight text-white sm:rounded-2xl sm:py-4 sm:text-lg"
                     >
-                      Terminer le Tribunal — Voir le podium
+                      <span className="sm:hidden">Voir le podium</span>
+                      <span className="hidden sm:inline">Terminer le Tribunal — Voir le podium</span>
                     </motion.button>
                   )}
                 </div>
@@ -440,7 +441,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => finishTribunalRemote(roomCode)}
-              className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-2xl font-bold text-lg mt-4"
+              className="mt-3 w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3 text-sm font-bold text-white sm:mt-4 sm:rounded-2xl sm:py-4 sm:text-lg"
             >
               Voir le podium
             </motion.button>
@@ -456,26 +457,28 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     );
 
     return (
-      <div className="flex flex-1 flex-col items-center justify-center w-full max-w-md mx-auto text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center w-full max-w-md mx-auto px-1 text-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/90 p-8 rounded-[2rem] shadow-lg w-full"
+          className="w-full rounded-2xl bg-white/90 p-4 shadow-lg sm:rounded-[2rem] sm:p-8"
         >
-          <h2 className="text-4xl font-bold mb-4">🏆 Fin du Jeu !</h2>
-          <p className="text-slate-600 mb-8 font-medium">Voici les résultats finaux :</p>
+          <h2 className="mb-2 text-2xl font-bold sm:mb-4 sm:text-4xl">🏆 Fin du Jeu !</h2>
+          <p className="mb-4 text-sm font-medium text-slate-600 sm:mb-8 sm:text-base">Voici les résultats finaux :</p>
 
-          <ul className="flex flex-col gap-3 mb-8">
+          <ul className="mb-4 flex flex-col gap-2 sm:mb-8 sm:gap-3">
             {sortedPlayers.map((p, i) => (
               <li
                 key={p.id}
-                className="bg-white py-4 px-5 rounded-2xl font-bold text-slate-800 text-lg flex justify-between items-center shadow-sm border border-slate-100 relative overflow-hidden"
+                className="relative flex items-center justify-between overflow-hidden rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 shadow-sm sm:rounded-2xl sm:px-5 sm:py-4 sm:text-lg"
               >
                 {i === 0 && <div className="absolute inset-0 bg-yellow-100/50"></div>}
-                <span className="relative z-10">
+                <span className="relative z-10 min-w-0 truncate pr-2 text-left">
                   {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👏"} {p.name}
                 </span>
-                <span className="text-violet-600 text-xl relative z-10">{currentScores[p.id] || 0} pts</span>
+                <span className="relative z-10 shrink-0 text-base text-violet-600 sm:text-xl">
+                  {currentScores[p.id] || 0} pts
+                </span>
               </li>
             ))}
           </ul>
@@ -485,7 +488,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={handleReturnLobby}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition shadow-lg"
+              className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 sm:rounded-2xl sm:py-4 sm:text-lg"
             >
               Retour au Salon
             </motion.button>
@@ -517,14 +520,15 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       : "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg";
 
   return (
-    <div className="flex flex-1 flex-col items-center w-full max-w-md mx-auto">
-      <div className="w-full flex justify-between items-center mb-6 bg-white/60 px-6 py-3 rounded-full shadow-sm backdrop-blur-md">
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-          Question {currentIndex + 1} / {questions.length}
+    <div className="flex min-h-0 flex-1 flex-col items-center w-full max-w-md mx-auto px-1 sm:px-0">
+      <div className="mb-3 flex w-full items-center justify-between gap-2 rounded-full bg-white/60 px-3 py-2 shadow-sm backdrop-blur-md sm:mb-6 sm:px-6 sm:py-3">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:text-sm sm:tracking-widest">
+          Q. {currentIndex + 1}/{questions.length}
         </span>
-        <span className="text-sm font-bold text-violet-600 bg-violet-100 px-3 py-1 rounded-full flex gap-2">
-          {currentQuestion.points} PTS
-          <span className="text-slate-400">| Score: {currentScores[myPlayerId] || 0}</span>
+        <span className="flex items-center gap-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-600 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm">
+          <span>{currentQuestion.points} pts</span>
+          <span className="text-slate-400">·</span>
+          <span className="tabular-nums text-slate-600">{currentScores[myPlayerId] || 0}</span>
         </span>
       </div>
 
@@ -532,7 +536,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         key={`q-${currentQuestion.id}`}
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full bg-white/90 rounded-[2rem] p-8 shadow-md text-center mb-8 relative overflow-hidden"
+        className="relative mb-4 w-full overflow-hidden rounded-2xl bg-white/90 p-4 text-center shadow-md sm:mb-8 sm:rounded-[2rem] sm:p-8"
       >
         <div className="absolute top-0 left-0 h-2 bg-slate-100 w-full">
           <motion.div
@@ -543,7 +547,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           />
         </div>
 
-        <span className="block text-4xl mb-4 mt-2">
+        <span className="mb-2 mt-1 block text-3xl sm:mb-4 sm:mt-2 sm:text-4xl">
           {phase === "reveal"
             ? isMinibac
               ? "🎭"
@@ -554,10 +558,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               ? "⏳"
               : "🤔"}
         </span>
-        <h2 className="text-2xl font-bold text-slate-800 leading-snug">{currentQuestion.question}</h2>
+        <h2 className="text-lg font-bold leading-snug text-slate-800 sm:text-2xl">{currentQuestion.question}</h2>
       </motion.div>
 
-      <div className="w-full flex-1 flex flex-col gap-3">
+      <div className="flex w-full min-h-0 flex-1 flex-col gap-2 pb-1 sm:gap-3 sm:pb-0">
         {isTextBased ? (
           <div className="flex-1 flex flex-col gap-4 w-full">
             {isMinibac ? (
@@ -708,7 +712,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleAnswerClick(option)}
                 disabled={choiceLocked || phase !== "question"}
-                className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${!choiceLocked && phase === "question" ? "hover:shadow-md cursor-pointer" : "cursor-default"}`}
+                className={`relative w-full overflow-hidden rounded-xl border p-3.5 text-sm font-bold shadow-sm transition-all sm:rounded-2xl sm:p-5 sm:text-lg ${revealClass} ${!choiceLocked && phase === "question" ? "cursor-pointer hover:shadow-md" : "cursor-default"}`}
               >
                 {option}
                 {phase === "reveal" && option === currentQuestion.answer && myPoints > 0 && (

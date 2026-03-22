@@ -213,183 +213,279 @@ export default function GameApp() {
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-[var(--app-bg)] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <header className="relative z-10 mb-8 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-violet-600/90">Samedi</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Parties en ligne</h1>
+    <div className="relative flex min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--app-bg)] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="relative z-10 mb-3 flex shrink-0 items-center justify-between gap-3 sm:mb-6">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-600/90 sm:text-xs sm:tracking-[0.2em]">
+            Samedi
+          </p>
+          <h1 className="mt-0.5 truncate text-lg font-bold tracking-tight text-slate-900 sm:mt-1 sm:text-2xl">
+            Parties en ligne
+          </h1>
         </div>
         {view !== "home" && (
-          <button onClick={() => void goHome()} disabled={busy} className="rounded-full bg-white/80 px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-white">
+          <button
+            onClick={() => void goHome()}
+            disabled={busy}
+            className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white sm:px-4 sm:py-2 sm:text-sm"
+          >
             Quitter
           </button>
         )}
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col">
+      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto scroll-touch">
         <AnimatePresence mode="wait">
           
           {view === "home" && (
-            <motion.section key="home" className="flex flex-1 flex-col justify-center gap-4" {...pageTransition}>
-              <button onClick={() => setView("create")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105">
+            <motion.section
+              key="home"
+              className="flex min-h-0 flex-1 flex-col justify-center gap-3 py-2 sm:gap-4 sm:py-0"
+              {...pageTransition}
+            >
+              <button
+                onClick={() => setView("create")}
+                disabled={busy}
+                className="flex min-h-[3.5rem] w-full items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 text-base font-semibold text-white shadow-md transition hover:brightness-105 sm:min-h-[4.25rem] sm:rounded-[1.75rem] sm:text-lg"
+              >
                 Créer une partie
               </button>
-              <button onClick={() => setView("join")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-white/90 px-6 text-lg font-semibold text-slate-800 shadow-sm transition hover:bg-white">
+              <button
+                onClick={() => setView("join")}
+                disabled={busy}
+                className="flex min-h-[3.5rem] w-full items-center justify-center rounded-2xl bg-white/90 px-5 text-base font-semibold text-slate-800 shadow-sm transition hover:bg-white sm:min-h-[4.25rem] sm:rounded-[1.75rem] sm:text-lg"
+              >
                 Rejoindre une partie
               </button>
             </motion.section>
           )}
 
           {view === "create" && (
-            <motion.section key="create" className="flex flex-1 flex-col justify-center" {...pageTransition}>
-              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
-                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
-                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Créer une salle</h2>
-                  
-                  <div 
-                    className="relative h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
+            <motion.section key="create" className="flex min-h-0 flex-1 flex-col justify-start pt-1 sm:justify-center sm:pt-0" {...pageTransition}>
+              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-3 sm:gap-5">
+                <div className="flex flex-col items-center gap-3 rounded-2xl bg-white/60 p-4 shadow-sm backdrop-blur-md sm:gap-4 sm:rounded-[2rem] sm:p-6">
+                  <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 sm:text-sm">
+                    Créer une salle
+                  </h2>
+
+                  <div
+                    className="relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-slate-100 shadow-inner ring-2 ring-white transition hover:scale-[1.03] sm:h-24 sm:w-24 sm:ring-4"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {avatar ? (
                       <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Optionnel)</span>
+                      <span className="px-1 text-center text-[10px] font-semibold leading-tight text-slate-400 sm:text-xs">
+                        Photo
+                        <br />
+                        (opt.)
+                      </span>
                     )}
                   </div>
                   <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
 
                   <input
-                    type="text" required placeholder="Entre ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
-                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-4 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                    type="text"
+                    required
+                    placeholder="Ton pseudo…"
+                    value={pseudo}
+                    onChange={(e) => setPseudo(e.target.value)}
+                    maxLength={15}
+                    className="w-full rounded-xl border-none bg-white/90 px-3 py-3 text-center text-base font-bold text-slate-800 shadow-inner outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-violet-400/50 sm:rounded-2xl sm:py-3.5 sm:text-lg"
                   />
                 </div>
 
-                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
-                
-                <button type="submit" disabled={busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
-                  {busy ? "Création en cours…" : "Confirmer et Créer"}
+                {joinError && <p className="text-center text-xs font-medium text-red-600 sm:text-sm">{joinError}</p>}
+
+                <button
+                  type="submit"
+                  disabled={busy || !pseudo.trim()}
+                  className="flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 text-sm font-semibold text-white shadow-md disabled:opacity-40 sm:min-h-[3.5rem] sm:rounded-[1.5rem] sm:text-base"
+                >
+                  {busy ? "Création…" : "Confirmer et créer"}
                 </button>
-                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
+                <button type="button" onClick={() => setView("home")} className="py-1 text-center text-xs font-medium text-slate-500 sm:text-sm">
+                  ← Retour
+                </button>
               </form>
             </motion.section>
           )}
 
           {view === "join" && (
-            <motion.section key="join" className="flex flex-1 flex-col justify-center" {...pageTransition}>
-              <form onSubmit={handleJoinSubmit} className="flex flex-col gap-6">
-                <div className="flex flex-col items-center gap-4 bg-white/60 p-6 rounded-[2rem] shadow-sm backdrop-blur-md">
-                  <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Rejoindre une salle</h2>
-                  
-                  <input
-                    inputMode="numeric" pattern="\d{4}" maxLength={4} required placeholder="Code : • • • •"
-                    value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    className="w-full rounded-[1.5rem] border-none bg-white/95 px-6 py-4 text-center font-mono text-2xl tracking-[0.2em] text-slate-900 shadow-sm outline-none focus:ring-4 focus:ring-violet-400/50"
-                  />
-                  
-                  <div className="h-px w-full bg-slate-200/50 my-2"></div>
+            <motion.section key="join" className="flex min-h-0 flex-1 flex-col justify-start pt-1 sm:justify-center sm:pt-0" {...pageTransition}>
+              <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3 sm:gap-5">
+                <div className="flex flex-col items-center gap-3 rounded-2xl bg-white/60 p-4 shadow-sm backdrop-blur-md sm:gap-4 sm:rounded-[2rem] sm:p-6">
+                  <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 sm:text-sm">
+                    Rejoindre une salle
+                  </h2>
 
-                  <div 
-                    className="relative h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center shadow-inner cursor-pointer overflow-hidden ring-4 ring-white transition hover:scale-105"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {avatar ? (
-                      <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Opt)</span>
-                    )}
+                  <input
+                    inputMode="numeric"
+                    pattern="\d{4}"
+                    maxLength={4}
+                    required
+                    placeholder="• • • •"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className="w-full rounded-xl border-none bg-white/95 px-4 py-3 text-center font-mono text-xl tracking-[0.25em] text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-violet-400/50 sm:rounded-[1.5rem] sm:py-3.5 sm:text-2xl"
+                  />
+
+                  <div className="my-0.5 h-px w-full bg-slate-200/50 sm:my-1" />
+
+                  <div className="flex w-full items-center gap-3">
+                    <div
+                      className="relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-slate-100 shadow-inner ring-2 ring-white transition hover:scale-[1.03] sm:h-20 sm:w-20 sm:ring-4"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {avatar ? (
+                        <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-center text-[10px] font-semibold leading-tight text-slate-400 sm:text-xs">
+                          Photo
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Pseudo…"
+                      value={pseudo}
+                      onChange={(e) => setPseudo(e.target.value)}
+                      maxLength={15}
+                      className="min-w-0 flex-1 rounded-xl border-none bg-white/90 px-3 py-2.5 text-base font-bold text-slate-800 shadow-inner outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-violet-400/50 sm:rounded-2xl sm:py-3 sm:text-lg"
+                    />
                   </div>
                   <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
-
-                  <input
-                    type="text" required placeholder="Ton pseudo..." value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={15}
-                    className="w-full rounded-2xl border-none bg-white/90 px-4 py-3 text-center text-lg font-bold text-slate-800 shadow-inner focus:ring-4 focus:ring-violet-400/50 outline-none placeholder:text-slate-400 placeholder:font-normal"
-                  />
                 </div>
 
-                {joinError && <p className="text-center text-sm font-medium text-red-600">{joinError}</p>}
-                <button type="submit" disabled={pin.length !== 4 || busy || !pseudo.trim()} className="flex min-h-[3.75rem] w-full items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-base font-semibold text-white shadow-md disabled:opacity-40">
+                {joinError && <p className="text-center text-xs font-medium text-red-600 sm:text-sm">{joinError}</p>}
+                <button
+                  type="submit"
+                  disabled={pin.length !== 4 || busy || !pseudo.trim()}
+                  className="flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 text-sm font-semibold text-white shadow-md disabled:opacity-40 sm:min-h-[3.5rem] sm:rounded-[1.5rem] sm:text-base"
+                >
                   {busy ? "Connexion…" : "Entrer dans la salle"}
                 </button>
-                <button type="button" onClick={() => setView("home")} className="text-sm text-slate-500 font-medium mt-2">← Retour</button>
+                <button type="button" onClick={() => setView("home")} className="py-1 text-center text-xs font-medium text-slate-500 sm:text-sm">
+                  ← Retour
+                </button>
               </form>
             </motion.section>
           )}
 
           {view === "lobby" && roomCode && (
-            <motion.section key="lobby" className="flex flex-1 flex-col" {...pageTransition}>
-              <div className="mb-8 rounded-[2rem] bg-white/85 p-6 shadow-sm backdrop-blur-md">
-                <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500">Code de la salle</p>
-                <p className="mt-3 text-center font-mono text-4xl font-bold tracking-[0.35em] text-slate-900">{roomCode}</p>
+            <motion.section key="lobby" className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4" {...pageTransition}>
+              <div className="shrink-0 rounded-2xl bg-white/85 px-4 py-3 shadow-sm backdrop-blur-md sm:rounded-[2rem] sm:p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-xs sm:tracking-widest">
+                    Code salle
+                  </p>
+                  <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-600 sm:text-xs">
+                    {players.length} joueur{players.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <p className="mt-1 text-center font-mono text-3xl font-bold tracking-[0.28em] text-slate-900 sm:mt-2 sm:text-4xl sm:tracking-[0.35em]">
+                  {roomCode}
+                </p>
               </div>
 
-              <div className="flex flex-1 flex-col rounded-[2rem] bg-white/70 p-5 shadow-sm backdrop-blur-sm">
-                <h2 className="mb-4 text-sm font-bold text-slate-600 uppercase tracking-wide">Joueurs ({players.length})</h2>
-                <ul className="flex flex-col gap-3">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white/70 p-3 shadow-sm backdrop-blur-sm sm:rounded-[2rem] sm:p-5">
+                <h2 className="mb-2 shrink-0 text-[11px] font-bold uppercase tracking-wide text-slate-600 sm:mb-3 sm:text-sm">
+                  Joueurs
+                </h2>
+                <ul className="scroll-touch flex max-h-[min(36dvh,260px)] flex-col gap-2 overflow-y-auto pr-0.5 sm:max-h-[min(42dvh,320px)] sm:gap-2.5">
                   <AnimatePresence>
                     {players.map((p) => (
-                      <motion.li key={p.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm">
-                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-lg font-bold text-white shadow-inner overflow-hidden border-2 border-white">
-                          {p.avatar && p.avatar.startsWith("data:image") ? <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" /> : <span>{p.name.slice(0, 2).toUpperCase()}</span>}
+                      <motion.li
+                        key={p.id}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 12 }}
+                        className="flex shrink-0 items-center gap-3 rounded-xl bg-white/90 px-3 py-2.5 shadow-sm sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-3"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-bold text-white shadow-inner sm:h-11 sm:w-11 sm:text-base">
+                          {p.avatar && p.avatar.startsWith("data:image") ? (
+                            <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span>{p.name.slice(0, 2).toUpperCase()}</span>
+                          )}
                         </span>
-                        <span className="font-bold text-slate-800 text-lg">{p.name}</span>
-                        {p.id === myPlayerId && <span className="ml-auto text-xs font-bold text-violet-500 bg-violet-100 px-2 py-1 rounded-full">MOI</span>}
+                        <span className="min-w-0 flex-1 truncate font-bold text-slate-800 text-sm sm:text-base">{p.name}</span>
+                        {p.id === myPlayerId && (
+                          <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-600 sm:text-xs">
+                            MOI
+                          </span>
+                        )}
                       </motion.li>
                     ))}
                   </AnimatePresence>
                 </ul>
 
                 {isHost ? (
-                  <div className="mt-8 border-t border-slate-200/50 pt-6">
+                  <div className="mt-3 shrink-0 border-t border-slate-200/50 pt-3 sm:mt-4 sm:pt-4">
                     {!selectedGame ? (
-                      <div className="flex flex-col gap-3 animate-in fade-in">
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center mb-2">Choisir un jeu</h3>
-                        <button 
-                          onClick={() => setSelectedGame('culture-quiz')}
-                          className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-[2px] transition hover:scale-[1.02] shadow-sm"
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">
+                          Choisir un jeu
+                        </h3>
+                        <button
+                          onClick={() => setSelectedGame("culture-quiz")}
+                          className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-[1.5px] shadow-sm transition hover:brightness-[1.02] sm:rounded-2xl sm:p-[2px]"
                         >
-                          <div className="flex h-full w-full items-center justify-between rounded-[14px] bg-white px-5 py-4">
-                            <span className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</span>
-                            <span className="text-violet-500 font-bold text-sm">Sélectionner →</span>
+                          <div className="flex w-full items-center justify-between gap-2 rounded-[11px] bg-white px-3 py-3 sm:rounded-[14px] sm:px-5 sm:py-3.5">
+                            <span className="min-w-0 truncate text-left text-sm font-bold text-slate-800 sm:text-base">
+                              🧠 Culture Quiz
+                            </span>
+                            <span className="shrink-0 text-xs font-bold text-violet-500 sm:text-sm">→</span>
                           </div>
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-bold text-slate-800 text-lg">🧠 Culture Quiz</h3>
-                          <button onClick={() => setSelectedGame(null)} className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition">
+                      <div className="flex flex-col gap-3 sm:gap-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base">🧠 Culture Quiz</h3>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGame(null)}
+                            className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500 transition hover:bg-slate-200 sm:px-3 sm:text-xs"
+                          >
                             Changer
                           </button>
                         </div>
-                        
-                        <label className="text-sm font-bold text-slate-600 uppercase tracking-wider block text-center">
-                          Nombre de questions : <span className="text-violet-600 text-xl">{questionCount}</span>
-                        </label>
-                        <input 
-                          type="range" min="3" max="15" step="1" 
-                          value={questionCount} 
-                          onChange={(e) => setQuestionCount(Number(e.target.value))} 
-                          className="w-full accent-violet-600 mb-4" 
+
+                        <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                          <span className="font-semibold text-slate-600">Questions</span>
+                          <span className="font-mono text-lg font-bold text-violet-600 tabular-nums sm:text-xl">{questionCount}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="3"
+                          max="15"
+                          step="1"
+                          value={questionCount}
+                          onChange={(e) => setQuestionCount(Number(e.target.value))}
+                          className="mb-1 w-full accent-violet-600"
                         />
-                        
+
                         {startError && (
-                          <p className="text-center text-sm font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100 mb-2">
+                          <p className="rounded-lg border border-red-100 bg-red-50 p-2 text-center text-xs font-bold text-red-500 sm:p-3 sm:text-sm">
                             {startError}
                           </p>
                         )}
-                        
-                        <button 
-                          onClick={handleStartGame} disabled={busy || players.length < 1} 
-                          className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+
+                        <button
+                          onClick={handleStartGame}
+                          disabled={busy || players.length < 1}
+                          className="flex w-full items-center justify-center rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50 sm:rounded-2xl sm:py-3.5 sm:text-base"
                         >
-                          {busy ? "Démarrage..." : "LANCER LA PARTIE !"}
+                          {busy ? "Démarrage…" : "Lancer la partie"}
                         </button>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="mt-8 border-t border-slate-200/50 pt-6 text-center">
-                    <p className="text-sm font-bold text-slate-500 animate-pulse">En attente de l'hôte...</p>
+                  <div className="mt-3 shrink-0 border-t border-slate-200/50 pt-3 text-center sm:mt-4 sm:pt-4">
+                    <p className="text-xs font-bold text-slate-500 animate-pulse sm:text-sm">En attente de l&apos;hôte…</p>
                   </div>
                 )}
               </div>
@@ -398,7 +494,7 @@ export default function GameApp() {
 
           {/* C'EST ICI QU'ON APPELLE TON NOUVEAU COMPOSANT DE JEU */}
           {view === "playing" && roomState && roomCode && myPlayerId && (
-            <motion.section key="playing" className="flex flex-1 flex-col" {...pageTransition}>
+            <motion.section key="playing" className="flex min-h-0 flex-1 flex-col" {...pageTransition}>
               <QuizGame 
                 roomCode={roomCode} 
                 roomState={roomState} 

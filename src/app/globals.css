@@ -22,3 +22,9 @@ body {
   color: var(--foreground);
   min-height: 100dvh;
 }
+
+/* Liste scrollable discrète (mobile) */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
