@@ -68,8 +68,8 @@ const MINI_BAC_CATEGORIES = [
   "Un super-pouvoir", "Un gros mot poli", "Un truc qui pue"
 ];
 
-// Les lettres faciles/moyennes pour le Mini-Bac (on évite W, X, Y, Z pour l'instant)
-const MINI_BAC_LETTERS = "ABCDEFGHIJKLMNOPQRSTUV";
+// Mini-Bac : pas de U, W, X, Y, Z (trop difficiles / peu de mots)
+const MINI_BAC_LETTERS = "ABCDEFGHIJKLMNOPQRSTV";
 
 // --- LA MÉGA BANQUE DE QUESTIONS ---
 export const QUIZ_BANK: QuizQuestion[] = [
@@ -102,6 +102,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "tf26", type: "true_false", question: "La France est le pays avec le plus de fuseaux horaires au monde.", answer: "Vrai", options: ["Vrai", "Faux"], points: 70 },
   { id: "tf27", type: "true_false", question: "Les bananes poussent sur des arbres.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 }, // C'est une plante herbacée
   { id: "tf28", type: "true_false", question: "Le son voyage plus vite dans l'eau que dans l'air.", answer: "Vrai", options: ["Vrai", "Faux"], points: 60 },
+  { id: "tf29", type: "true_false", question: "L'ADN humain est identique à 50% à celui d'une banane.", answer: "Vrai", options: ["Vrai", "Faux"], points: 70 },
+  { id: "tf30", type: "true_false", question: "Le cœur d'une crevette se situe dans sa tête.", answer: "Vrai", options: ["Vrai", "Faux"], points: 80 },
+  { id: "tf31", type: "true_false", question: "Les antibiotiques sont efficaces contre les virus.", answer: "Faux", options: ["Vrai", "Faux"], points: 60 },
+  { id: "tf32", type: "true_false", question: "Le fémur est l'os le plus solide du corps humain.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf33", type: "true_false", question: "Le son peut se propager dans le vide spatial.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf34", type: "true_false", question: "Les neurones sont les seules cellules du corps qui ne se divisent jamais.", answer: "Faux", options: ["Vrai", "Faux"], points: 90 },
+  { id: "tf35", type: "true_false", question: "Un éclair est cinq fois plus chaud que la surface du Soleil.", answer: "Vrai", options: ["Vrai", "Faux"], points: 80 },
+  { id: "tf36", type: "true_false", question: "Les veines transportent toujours du sang pauvre en oxygène.", answer: "Faux", options: ["Vrai", "Faux"], points: 100 }, // Exception : veines pulmonaires
 
   // 🔵 QCM (15 questions)
   { id: "qcm1", type: "qcm", question: "Quelle est la capitale de l'Australie ?", answer: "Canberra", options: ["Sydney", "Melbourne", "Canberra", "Perth"], points: 100 },
@@ -137,6 +145,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "qcm31", type: "qcm", question: "Quel organe produit l'insuline ?", answer: "Le pancréas", options: ["Le foie", "Le pancréas", "La rate", "Les reins"], points: 120 },
   { id: "qcm32", type: "qcm", question: "Qui a réalisé le film 'Inception' ?", answer: "Christopher Nolan", options: ["Steven Spielberg", "Christopher Nolan", "Quentin Tarantino", "Martin Scorsese"], points: 100 },
   { id: "qcm33", type: "qcm", question: "Quel est le plus grand mammifère terrestre ?", answer: "L'éléphant d'Afrique", options: ["Le rhinocéros", "L'éléphant d'Afrique", "La girafe", "L'hippopotame"], points: 80 },
+  { id: "qcm34", type: "qcm", question: "Quel empire était dirigé par Soliman le Magnifique ?", answer: "L'Empire Ottoman", options: ["L'Empire Perse", "L'Empire Ottoman", "L'Empire Moghol", "L'Empire Romain"], points: 100 },
+  { id: "qcm35", type: "qcm", question: "Quelle est la capitale la plus haute du monde (altitude) ?", answer: "La Paz", options: ["Quito", "La Paz", "Bogota", "Lhassa"], points: 120 },
+  { id: "qcm36", type: "qcm", question: "En quelle année a été découvert le tombeau de Toutânkhamon ?", answer: "1922", options: ["1898", "1912", "1922", "1936"], points: 100 },
+  { id: "qcm37", type: "qcm", question: "Lequel de ces pays ne possède pas d'accès à la mer ?", answer: "Suisse", options: ["Belgique", "Suisse", "Norvège", "Portugal"], points: 80 },
+  { id: "qcm38", type: "qcm", question: "Qui était le président des USA durant la Guerre de Sécession ?", answer: "Abraham Lincoln", options: ["George Washington", "Andrew Jackson", "Abraham Lincoln", "Ulysses S. Grant"], points: 100 },
+  { id: "qcm39", type: "qcm", question: "Quel fleuve traverse le plus grand nombre de pays ?", answer: "Le Danube", options: ["Le Nil", "L'Amazone", "Le Danube", "Le Rhin"], points: 120 },
+  { id: "qcm40", type: "qcm", question: "Quelle était la capitale de l'Empire Inca ?", answer: "Cuzco", options: ["Machu Picchu", "Lima", "Quito", "Cuzco"], points: 100 },
+  { id: "qcm41", type: "qcm", question: "Quel pays possède le plus d'îles au monde ?", answer: "La Suède", options: ["L'Indonésie", "La Grèce", "Le Canada", "La Suède"], points: 150 }, // Plus de 220 000 îles !
 
   // 🟠 ESTIMATION / JUSTE PRIX (15 questions)
   { id: "est1", type: "estimation", question: "Combien pèse la Tour Eiffel (en tonnes) ?", answer: 10100, points: 100 },
@@ -172,6 +188,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "est31", type: "estimation", question: "Quelle est la longueur de la piscine olympique (en mètres) ?", answer: 50, points: 80 },
   { id: "est32", type: "estimation", question: "En kilomètres, quelle est la circonférence de la Terre ?", answer: 40075, points: 200 },
   { id: "est33", type: "estimation", question: "Combien d'atomes d'oxygène y a-t-il dans une molécule d'eau ?", answer: 1, points: 50 },
+  { id: "est34", type: "estimation", question: "Combien d'éléments contient le tableau périodique actuel ?", answer: 118, points: 100 },
+  { id: "est35", type: "estimation", question: "Quelle est la distance entre la Terre et Mars (en millions de km, au plus proche) ?", answer: 55, points: 150 },
+  { id: "est36", type: "estimation", question: "Combien de muscles possède le corps humain (environ) ?", answer: 650, points: 100 },
+  { id: "est37", type: "estimation", question: "Combien de temps met la lumière du Soleil pour atteindre la Terre (en secondes) ?", answer: 499, points: 150 }, // ~8 min 19s
+  { id: "est38", type: "estimation", question: "Quel est le record du monde de durée de sommeil pour un humain (en heures) ?", answer: 264, points: 200 }, // Expérience de Randy Gardner
+  { id: "est39", type: "estimation", question: "Combien de battements de cœur un humain fait-il en moyenne par minute au repos ?", answer: 70, points: 50 },
+  { id: "est40", type: "estimation", question: "Quelle est la température du zéro absolu (en degrés Celsius) ?", answer: -273, points: 150 },
+  { id: "est41", type: "estimation", question: "Combien de vertèbres compose la colonne dorsale humaine ?", answer: 33, points: 120 },
 
   // 🟣 QUESTIONS OUVERTES TEXTE (10 questions)
   { id: "op1", type: "open", question: "Quelle est la capitale du Japon ?", answer: "Tokyo", points: 100 },
@@ -202,6 +226,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "op26", type: "open", question: "Dans quel sport utilise-t-on un volant ?", answer: "Badminton", points: 100 },
   { id: "op27", type: "open", question: "Quel est l'animal le plus haut du monde ?", answer: "Girafe", points: 80 },
   { id: "op28", type: "open", question: "Quel océan borde la côte ouest des États-Unis ?", answer: "Pacifique", points: 100 },
+  { id: "op29", type: "open", question: "Quel gaz les plantes absorbent-elles pour la photosynthèse ?", answer: "Dioxyde de carbone", points: 100 },
+  { id: "op30", type: "open", question: "Comment appelle-t-on la partie colorée de l'œil ?", answer: "Iris", points: 80 },
+  { id: "op31", type: "open", question: "Qui a découvert la pénicilline ?", answer: "Fleming", points: 150 },
+  { id: "op32", type: "open", question: "Quelle est la plus grande glande du corps humain ?", answer: "Foie", points: 120 },
+  { id: "op33", type: "open", question: "Quel instrument utilise un médecin pour écouter le cœur ?", answer: "Stéthoscope", points: 100 },
+  { id: "op34", type: "open", question: "Dans quel pays se trouve le mont Kilimandjaro ?", answer: "Tanzanie", points: 120 },
+  { id: "op35", type: "open", question: "Quel est le nom du pigment qui donne la couleur à la peau ?", answer: "Mélanine", points: 100 },
+  { id: "op36", type: "open", question: "Quel acide trouve-t-on en abondance dans l'estomac ?", answer: "Chlorhydrique", points: 130 },
 
   // 🔴 DATES (Années exactes - On utilise le pavé numérique comme pour les estimations)
   { id: "date1", type: "date", question: "En quelle année le Titanic a-t-il coulé ?", answer: 1912, points: 150 },
@@ -232,6 +264,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "date26", type: "date", question: "En quelle année Nelson Mandela a-t-il été libéré de prison ?", answer: 1990, points: 180 },
   { id: "date27", type: "date", question: "En quelle année a débuté la guerre du Vietnam ?", answer: 1955, points: 200 },
   { id: "date28", type: "date", question: "En quelle année a été fondé l'empire romain ?", answer: -27, points: 250 },
+  { id: "date29", type: "date", question: "En quelle année a commencé la construction de la pyramide de Khéops (environ) ?", answer: -2560, points: 250 },
+  { id: "date30", type: "date", question: "En quelle année l'esclavage a-t-il été aboli aux États-Unis ?", answer: 1865, points: 150 },
+  { id: "date31", type: "date", question: "En quelle année a été fondée l'ONU ?", answer: 1945, points: 100 },
+  { id: "date32", type: "date", question: "En quelle année Einstein a-t-il publié la théorie de la relativité générale ?", answer: 1915, points: 180 },
+  { id: "date33", type: "date", question: "En quelle année a eu lieu la première transplantation cardiaque ?", answer: 1967, points: 200 },
+  { id: "date34", type: "date", question: "En quelle année s'est terminé l'Empire Romain d'Occident ?", answer: 476, points: 150 },
+  { id: "date35", type: "date", question: "En quelle année a été lancé le premier satellite artificiel, Spoutnik ?", answer: 1957, points: 150 },
+  { id: "date36", type: "date", question: "En quelle année la structure de l'ADN a-t-elle été découverte ?", answer: 1953, points: 180 },
 
   ...GEO_FLAG_QUESTIONS,
   ...GEO_SHAPE_QUESTIONS,

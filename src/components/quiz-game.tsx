@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { QuizQuestion } from "@/lib/quiz-bank";
 import type { Player } from "@/lib/lobby-types";
 import {
@@ -106,6 +106,9 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const [inputValue, setInputValue] = useState("");
   const [minibacValues, setMinibacValues] = useState(["", "", "", ""]);
 
+  /** Fin de chrono : envoyer ce qui est dans les champs (sans exiger « Valider »). */
+  const autoSubmitBeforeRevealRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (!currentQuestion?.id) return;
     setPhase("question");
@@ -131,6 +134,47 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const effectiveChoice = localAnswer ?? myAnswer;
   const hasLockedAnswer = localSubmitted || myAnswer !== null || localAnswer !== null;
 
+  autoSubmitBeforeRevealRef.current = () => {
+    if (!currentQuestion) return;
+    if (phase !== "question" || gameState !== "playing") return;
+    if (localSubmitted || myAnswer !== null || localAnswer !== null) return;
+
+    if (currentQuestion.type === "minibac") {
+      const letter = currentQuestion.letter ?? "?";
+      const categories = currentQuestion.categories ?? [];
+      const values = minibacValues.map((v) => String(v).trim());
+      setLocalSubmitted(true);
+      const minibac: MinibacSubmission = { letter, categories, values };
+      void submitAnswerRemote(roomCode, myPlayerId, {
+        questionId: currentQuestion.id,
+        questionType: "minibac",
+        answerStr: JSON.stringify({ type: "minibac", letter, categories, values }),
+        minibac,
+      }).then((res) => {
+        if (!res.ok) setLocalSubmitted(false);
+      });
+      return;
+    }
+
+    if (
+      currentQuestion.type === "open" ||
+      currentQuestion.type === "estimation" ||
+      currentQuestion.type === "date" ||
+      currentQuestion.type === "geo_flag" ||
+      currentQuestion.type === "geo_shape"
+    ) {
+      const raw = inputValue.trim();
+      setLocalSubmitted(true);
+      void submitAnswerRemote(roomCode, myPlayerId, {
+        questionId: currentQuestion.id,
+        questionType: currentQuestion.type,
+        answerStr: raw,
+      }).then((res) => {
+        if (!res.ok) setLocalSubmitted(false);
+      });
+    }
+  };
+
   useEffect(() => {
     if (allAnswered && phase === "question" && gameState === "playing") {
       setPhase("reveal");
@@ -144,6 +188,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          autoSubmitBeforeRevealRef.current();
           setPhase("reveal");
           return 0;
         }
