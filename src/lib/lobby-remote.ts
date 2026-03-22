@@ -148,7 +148,8 @@ export async function measureSupabasePingMs(): Promise<number | null> {
   return Math.round(t1 - t0);
 }
 
-// --- MISE À JOUR : On prépare les réponses (answers: {}) au lancement
+// --- FONCTIONS DE JEU MISES À JOUR AVEC LE SYSTÈME DE SCORES ---
+
 export async function startGameRemote(roomCode: string, questionCount: number) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
@@ -159,7 +160,7 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
     .from("rooms")
     .update({
       game_state: "playing",
-      game_data: { questions: selectedQuestions, answers: {} },
+      game_data: { questions: selectedQuestions, answers: {}, scores: {} }, // Ajout des scores à 0
       current_question_index: 0
     })
     .eq("code", roomCode);
@@ -168,8 +169,7 @@ export async function startGameRemote(roomCode: string, questionCount: number) {
   return { ok: true };
 }
 
-// --- MISE À JOUR : On passe à la question suivante ET on vide les réponses
-export async function nextQuestionRemote(roomCode: string, nextIndex: number, currentQuestions: any[]) {
+export async function nextQuestionRemote(roomCode: string, nextIndex: number, currentQuestions: any[], currentScores: any) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
@@ -177,20 +177,27 @@ export async function nextQuestionRemote(roomCode: string, nextIndex: number, cu
     .from("rooms")
     .update({ 
       current_question_index: nextIndex,
-      game_data: { questions: currentQuestions, answers: {} }
+      // On conserve les scores, on garde les questions, on vide les réponses !
+      game_data: { questions: currentQuestions, answers: {}, scores: currentScores }
     })
     .eq("code", roomCode);
 
   return { ok: !error };
 }
 
-export async function endGameRemote(roomCode: string) {
+export async function endGameRemote(roomCode: string, finalScores: any) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
+  const { data: room } = await supabase.from("rooms").select("game_data").eq("code", roomCode).single();
+  const gameData = room?.game_data || {};
+
   const { error } = await supabase
     .from("rooms")
-    .update({ game_state: "finished" })
+    .update({ 
+      game_state: "finished",
+      game_data: { ...gameData, scores: finalScores }
+    })
     .eq("code", roomCode);
 
   return { ok: !error };

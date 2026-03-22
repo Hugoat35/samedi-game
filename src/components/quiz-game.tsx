@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { QuizQuestion } from "@/lib/quiz-bank";
 import type { Player } from "@/lib/lobby-types";
 import { nextQuestionRemote, endGameRemote, returnToLobbyRemote } from "@/lib/lobby-remote";
@@ -15,18 +15,18 @@ type QuizGameProps = {
   players: Player[];
 };
 
-// Durées dynamiques et optimisées
 const GET_DURATION = (type: string) => {
   if (type === "true_false") return 8; 
   if (type === "qcm") return 12;
-  return 15; // Estimation
+  return 15; 
 };
 
-const REVEAL_DURATION = 6; // 6 secondes pour lire la bonne réponse sans frustration
+const REVEAL_DURATION = 6;
 
 export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, players }: QuizGameProps) {
   const questions: QuizQuestion[] = roomState?.game_data?.questions || [];
   const answers: Record<string, string> = roomState?.game_data?.answers || {};
+  const currentScores: Record<string, number> = roomState?.game_data?.scores || {};
   const currentIndex = roomState?.current_question_index || 0;
   const gameState = roomState?.game_state; 
   const currentQuestion = questions[currentIndex];
@@ -37,16 +37,15 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
-  // 1. NOUVELLE QUESTION : On remet tout à zéro
+  // 1. CORRECTION DU BUG 1 & 2 : On ne remet à zéro QUE quand l'ID de la question change !
   useEffect(() => {
     if (gameState !== "playing" || !currentQuestion) return;
     setPhase("question");
     setTimeLeft(GET_DURATION(currentQuestion.type));
     setRevealTimeLeft(REVEAL_DURATION);
     setInputValue("");
-  }, [currentIndex, currentQuestion, gameState]);
+  }, [currentIndex, currentQuestion?.id, gameState]); // Le secret est ici : dépendance stricte à l'ID !
 
-  // 2. VÉRIFICATION AUTO-SKIP (Si tous les joueurs ont cliqué)
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount > 0 && answeredCount >= players.length;
   const myAnswer = answers[myPlayerId] || null;
@@ -58,10 +57,8 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     }
   }, [allAnswered, phase, gameState]);
 
-  // 3. CHRONO DE LA QUESTION
   useEffect(() => {
     if (phase !== "question" || gameState !== "playing" || allAnswered) return;
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -72,11 +69,41 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [phase, gameState, allAnswered]);
 
-  // 4. CHRONO DE TRANSITION (Le fameux délai réparé !)
+
+  // 2. LE MOTEUR DE CALCUL DES POINTS (Local)
+  const pointsEarnedThisRound = useMemo(() => {
+    if (phase !== "reveal" || !currentQuestion) return {};
+    const earned: Record<string, number> = {};
+
+    if (currentQuestion.type === "estimation") {
+      // Calculer la distance pour chaque joueur
+      const validAnswers = Object.entries(answers).map(([pId, ans]) => ({
+        pId, val: Number(ans), dist: Math.abs(Number(ans) - Number(currentQuestion.answer))
+      })).filter(a => !isNaN(a.val));
+
+      // Trier du plus proche au plus éloigné
+      validAnswers.sort((a, b) => a.dist - b.dist);
+      const pointsDistribution = [100, 80, 60, 40, 20]; // Les points par position
+      
+      validAnswers.forEach((ans, idx) => {
+        earned[ans.pId] = ans.dist === 0 ? currentQuestion.points + 50 : (pointsDistribution[idx] || 0); // Bonus +50 si tout pile
+      });
+    } else {
+      // QCM / TrueFalse / Open Text (Tolérance à la casse)
+      Object.entries(answers).forEach(([pId, ans]) => {
+        if (String(ans).trim().toLowerCase() === String(currentQuestion.answer).trim().toLowerCase()) {
+          earned[pId] = currentQuestion.points;
+        }
+      });
+    }
+    return earned;
+  }, [phase, answers, currentQuestion]);
+
+
+  // 3. LE MAÎTRE DU JEU (L'hôte met à jour la base avec les scores additionnés)
   useEffect(() => {
     if (phase !== "reveal" || gameState !== "playing") return;
 
@@ -85,13 +112,18 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         if (prev <= 1) {
           clearInterval(timer);
           
-          // Seul l'hôte donne l'ordre de passer à la suite (pour éviter les doublons)
           if (isHost) {
+            // Additionner les anciens scores avec les nouveaux
+            const newTotalScores = { ...currentScores };
+            Object.entries(pointsEarnedThisRound).forEach(([pId, pts]) => {
+              newTotalScores[pId] = (newTotalScores[pId] || 0) + pts;
+            });
+
             const nextIdx = currentIndex + 1;
             if (nextIdx >= questions.length) {
-              endGameRemote(roomCode);
+              endGameRemote(roomCode, newTotalScores);
             } else {
-              nextQuestionRemote(roomCode, nextIdx, questions);
+              nextQuestionRemote(roomCode, nextIdx, questions, newTotalScores);
             }
           }
           return 0;
@@ -101,10 +133,9 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [phase, gameState, isHost, currentIndex, questions, roomCode]);
+  }, [phase, gameState, isHost, currentIndex, questions, roomCode, currentScores, pointsEarnedThisRound]);
 
 
-  // 5. ENVOI DE LA RÉPONSE (Textes ou Boutons)
   const handleAnswerClick = async (answer: string | number) => {
     const answerStr = String(answer).trim();
     if (myAnswer !== null || phase !== "question" || isSubmitting || !answerStr) return;
@@ -115,9 +146,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       const { data } = await supabase.from("rooms").select("game_data").eq("code", roomCode).single();
       const gameData = data?.game_data || {};
       const currentAnswers = gameData.answers || {};
-      
       currentAnswers[myPlayerId] = answerStr;
-      
       await supabase.from("rooms").update({ 
         game_data: { ...gameData, answers: currentAnswers } 
       }).eq("code", roomCode);
@@ -129,19 +158,22 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     if (isHost) await returnToLobbyRemote(roomCode);
   };
 
-  // --- ÉCRAN DE FIN ---
+  // --- LE PODIUM DE FIN (Trie les joueurs par leur score !) ---
   if (gameState === "finished") {
+    const sortedPlayers = [...players].sort((a, b) => (currentScores[b.id] || 0) - (currentScores[a.id] || 0));
+
     return (
       <div className="flex flex-1 flex-col items-center justify-center w-full max-w-md mx-auto text-center">
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 p-8 rounded-[2rem] shadow-lg w-full">
           <h2 className="text-4xl font-bold mb-4">🏆 Fin du Jeu !</h2>
-          <p className="text-slate-600 mb-8 font-medium">Le calcul des scores arrive bientôt...</p>
+          <p className="text-slate-600 mb-8 font-medium">Voici les résultats finaux :</p>
           
           <ul className="flex flex-col gap-3 mb-8">
-            {players.map((p, i) => (
-              <li key={p.id} className="bg-white py-3 px-4 rounded-xl font-bold text-slate-800 text-lg flex justify-between items-center shadow-sm border border-slate-100">
-                <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👏"} {p.name}</span>
-                <span className="text-violet-600">0 pts</span>
+            {sortedPlayers.map((p, i) => (
+              <li key={p.id} className="bg-white py-4 px-5 rounded-2xl font-bold text-slate-800 text-lg flex justify-between items-center shadow-sm border border-slate-100 relative overflow-hidden">
+                {i === 0 && <div className="absolute inset-0 bg-yellow-100/50"></div>}
+                <span className="relative z-10">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "👏"} {p.name}</span>
+                <span className="text-violet-600 text-xl relative z-10">{currentScores[p.id] || 0} pts</span>
               </li>
             ))}
           </ul>
@@ -163,6 +195,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   const duration = GET_DURATION(currentQuestion.type);
   const isTextBased = currentQuestion.type === "estimation" || currentQuestion.type === "open";
   const isEstimation = currentQuestion.type === "estimation";
+  const myPoints = pointsEarnedThisRound[myPlayerId] || 0;
 
   return (
     <div className="flex flex-1 flex-col items-center w-full max-w-md mx-auto">
@@ -172,8 +205,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
           Question {currentIndex + 1} / {questions.length}
         </span>
-        <span className="text-sm font-bold text-violet-600 bg-violet-100 px-3 py-1 rounded-full">
+        <span className="text-sm font-bold text-violet-600 bg-violet-100 px-3 py-1 rounded-full flex gap-2">
           {currentQuestion.points} PTS
+          {/* Affiche le score en direct du joueur */}
+          <span className="text-slate-400">| Score: {currentScores[myPlayerId] || 0}</span>
         </span>
       </div>
 
@@ -194,7 +229,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         </div>
 
         <span className="block text-4xl mb-4 mt-2">
-          {phase === "reveal" ? "🛑" : (timeLeft <= 3 ? "⏳" : "🤔")}
+          {phase === "reveal" ? (myPoints > 0 ? "🎉" : "😭") : (timeLeft <= 3 ? "⏳" : "🤔")}
         </span>
         <h2 className="text-2xl font-bold text-slate-800 leading-snug">
           {currentQuestion.question}
@@ -204,7 +239,6 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       {/* ZONE DE RÉPONSES */}
       <div className="w-full flex-1 flex flex-col gap-3">
         
-        {/* CAS 1 : C'est une question de Texte/Estimation */}
         {isTextBased ? (
           <div className="flex-1 flex flex-col gap-4 w-full">
             <input
@@ -225,19 +259,20 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
               {myAnswer !== null ? "Réponse envoyée ✅" : "Valider"}
             </button>
 
-            {/* Révélation spéciale pour l'estimation */}
+            {/* Révélation Estimation */}
             {phase === "reveal" && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-6 rounded-2xl bg-white/90 shadow-md text-center">
                 <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">La bonne réponse</p>
                 <p className="text-4xl font-black text-green-500">{currentQuestion.answer}</p>
                 <div className="h-px w-full bg-slate-200 my-4"></div>
-                <p className="text-sm font-bold text-slate-500">Ton choix : <span className={myAnswer == currentQuestion.answer ? "text-green-500" : "text-red-500"}>{myAnswer || "Rien"}</span></p>
+                <p className="text-sm font-bold text-slate-500">Ton choix : <span className={myPoints > 0 ? "text-green-500" : "text-red-500"}>{myAnswer || "Rien"}</span></p>
+                {myPoints > 0 && <p className="text-violet-600 font-bold text-xl mt-2">+{myPoints} points !</p>}
               </motion.div>
             )}
           </div>
         ) : (
           
-          /* CAS 2 : C'est un QCM ou Vrai/Faux */
+          /* Révélation QCM */
           currentQuestion.options?.map((option, i) => {
             const isSelected = myAnswer === option;
             let revealClass = "bg-white text-slate-700 border-slate-100/50";
@@ -258,6 +293,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                 className={`relative overflow-hidden w-full p-5 rounded-2xl text-lg font-bold transition-all shadow-sm border ${revealClass} ${myAnswer === null && phase === "question" ? "hover:scale-[1.02] active:scale-95 hover:shadow-md cursor-pointer" : "cursor-default"}`}
               >
                 {option}
+                {/* Affiche les points gagnés directement sur le bon bouton */}
+                {phase === "reveal" && option === currentQuestion.answer && myPoints > 0 && (
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white font-black drop-shadow-md">+{myPoints}</span>
+                )}
               </button>
             );
           })
