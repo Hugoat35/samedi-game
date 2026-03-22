@@ -1,5 +1,6 @@
 import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
+import { getRandomQuestions } from "./quiz-bank";
 
 export type { Player };
 
@@ -140,4 +141,25 @@ export async function fetchPlayersRemote(roomCode: string): Promise<
 export async function measureSupabasePingMs(): Promise<number | null> {
   // ... inchangé
   return null; 
+}
+
+export async function startGameRemote(roomCode: string, questionCount: number) {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  // L'hôte pioche les questions en local...
+  const selectedQuestions = getRandomQuestions(questionCount);
+
+  // ... et les envoie sur Supabase pour que tout le monde ait les mêmes !
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_state: "playing",
+      game_data: { questions: selectedQuestions },
+      current_question_index: 0
+    })
+    .eq("code", roomCode);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }

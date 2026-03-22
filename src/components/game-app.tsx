@@ -3,14 +3,14 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useLobbyPlayers } from "@/hooks/use-lobby-players";
+import { useRoomState } from "@/hooks/use-room-state";
 import { isSupabaseConfigured } from "@/lib/env";
-import NetworkDebugPanel from "@/components/network-debug-panel";
-import { createRoomRemote, joinRoomRemote, leaveRoomRemote } from "@/lib/lobby-remote";
+import { createRoomRemote, joinRoomRemote, leaveRoomRemote, startGameRemote } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
-type View = "home" | "join" | "create" | "lobby";
+type View = "home" | "join" | "create" | "lobby" | "playing";
 
 const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
 const pageTransition = {
@@ -33,12 +33,14 @@ export default function GameApp() {
   const [isHost, setIsHost] = useState(false);
   const [isLeavingRoom, setIsLeavingRoom] = useState(false);
   
-  // États pour le profil
+  // Nouveaux états pour le jeu
   const [pseudo, setPseudo] = useState("");
-  const [avatar, setAvatar] = useState<string | null>(null); // Plus d'emojis, null par défaut
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [questionCount, setQuestionCount] = useState(10); // Curseur de l'hôte
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Traitement et redimensionnement de la photo
+  const roomState = useRoomState(roomCode);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -78,12 +80,19 @@ export default function GameApp() {
 
   const { players: remotePlayers, loading: remoteLoading } = useLobbyPlayers(
     roomCode,
-    Boolean(remote && view === "lobby"),
+    Boolean(remote && view !== "home" && view !== "join" && view !== "create"),
     remote ? { isHost, onRoomClosedByHost: handleKickedByHost } : undefined,
   );
 
+  // --- NOUVEAU : ÉCOUTER LE LANCEMENT DU JEU ---
   useEffect(() => {
-    if (!remote || view !== "lobby" || !roomCode || !myPlayerId) return;
+    if (roomState?.game_state === "playing" && view === "lobby") {
+      setView("playing");
+    }
+  }, [roomState?.game_state, view]);
+
+  useEffect(() => {
+    if (!remote || !roomCode || !myPlayerId || view === "home") return;
     const handleBeforeUnload = () => {
       const supabase = getSupabaseBrowser();
       if (supabase) {
@@ -126,7 +135,7 @@ export default function GameApp() {
     setMyPlayerId(null);
     setIsHost(false);
     setPin("");
-    setPseudo(""); // Réinitialiser le profil
+    setPseudo("");
     setAvatar(null);
   }, [remote, roomCode, myPlayerId, isHost]);
 
@@ -183,6 +192,14 @@ export default function GameApp() {
     }
   };
 
+  const handleStartGame = async () => {
+    if (remote && roomCode) {
+      setBusy(true);
+      await startGameRemote(roomCode, questionCount);
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-[var(--app-bg)] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <header className="relative z-10 mb-8 flex items-center justify-between">
@@ -200,7 +217,6 @@ export default function GameApp() {
       <main className="relative z-10 flex flex-1 flex-col">
         <AnimatePresence mode="wait">
           
-          {/* VUE ACCUEIL : Ultra épurée */}
           {view === "home" && (
             <motion.section key="home" className="flex flex-1 flex-col justify-center gap-4" {...pageTransition}>
               <button onClick={() => setView("create")} disabled={busy} className="flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 text-lg font-semibold text-white shadow-md transition hover:brightness-105">
@@ -212,7 +228,6 @@ export default function GameApp() {
             </motion.section>
           )}
 
-          {/* VUE CRÉATION : Profil -> Créer */}
           {view === "create" && (
             <motion.section key="create" className="flex flex-1 flex-col justify-center" {...pageTransition}>
               <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
@@ -250,7 +265,6 @@ export default function GameApp() {
             </motion.section>
           )}
 
-          {/* VUE REJOINDRE : Code + Profil -> Rejoindre */}
           {view === "join" && (
             <motion.section key="join" className="flex flex-1 flex-col justify-center" {...pageTransition}>
               <form onSubmit={handleJoinSubmit} className="flex flex-col gap-6">
@@ -274,9 +288,6 @@ export default function GameApp() {
                     ) : (
                       <span className="text-slate-400 text-xs font-semibold text-center leading-tight">Photo<br/>(Opt)</span>
                     )}
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition">
-                      <span className="text-white text-xl">📷</span>
-                    </div>
                   </div>
                   <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} />
 
@@ -295,7 +306,6 @@ export default function GameApp() {
             </motion.section>
           )}
 
-          {/* VUE LOBBY : Les joueurs ! */}
           {view === "lobby" && roomCode && (
             <motion.section key="lobby" className="flex flex-1 flex-col" {...pageTransition}>
               <div className="mb-8 rounded-[2rem] bg-white/85 p-6 shadow-sm backdrop-blur-md">
@@ -304,32 +314,63 @@ export default function GameApp() {
               </div>
 
               <div className="flex flex-1 flex-col rounded-[2rem] bg-white/70 p-5 shadow-sm backdrop-blur-sm">
-                <h2 className="mb-4 text-sm font-bold text-slate-600 uppercase tracking-wide">
-                  Joueurs ({players.length})
-                </h2>
+                <h2 className="mb-4 text-sm font-bold text-slate-600 uppercase tracking-wide">Joueurs ({players.length})</h2>
                 <ul className="flex flex-col gap-3">
                   <AnimatePresence>
-                    {players.map((p, i) => (
+                    {players.map((p) => (
                       <motion.li key={p.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center gap-4 rounded-2xl bg-white/90 px-4 py-3 shadow-sm">
-                        
-                        {/* Avatar photo OU Initiales */}
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-lg font-bold text-white shadow-inner overflow-hidden border-2 border-white">
-                          {p.avatar && p.avatar.startsWith("data:image") ? (
-                            <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" />
-                          ) : (
-                            <span>{p.name.slice(0, 2).toUpperCase()}</span>
-                          )}
+                          {p.avatar && p.avatar.startsWith("data:image") ? <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" /> : <span>{p.name.slice(0, 2).toUpperCase()}</span>}
                         </span>
-                        
                         <span className="font-bold text-slate-800 text-lg">{p.name}</span>
                         {p.id === myPlayerId && <span className="ml-auto text-xs font-bold text-violet-500 bg-violet-100 px-2 py-1 rounded-full">MOI</span>}
                       </motion.li>
                     ))}
                   </AnimatePresence>
                 </ul>
+
+                {/* --- PANNEAU DE L'HÔTE (Uniquement visible par le créateur) --- */}
+                {isHost ? (
+                  <div className="mt-8 border-t border-slate-200/50 pt-6">
+                    <label className="text-sm font-bold text-slate-600 uppercase tracking-wider block text-center mb-2">
+                      Nombre de questions : <span className="text-violet-600 text-lg">{questionCount}</span>
+                    </label>
+                    <input 
+                      type="range" min="5" max="30" step="1" 
+                      value={questionCount} 
+                      onChange={(e) => setQuestionCount(Number(e.target.value))} 
+                      className="w-full accent-violet-600 mb-6" 
+                    />
+                    <button 
+                      onClick={handleStartGame} disabled={busy || players.length < 1} 
+                      className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {busy ? "Démarrage..." : "LANCER LA PARTIE !"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-8 border-t border-slate-200/50 pt-6 text-center">
+                    <p className="text-sm font-bold text-slate-500 animate-pulse">En attente de l'hôte...</p>
+                  </div>
+                )}
               </div>
             </motion.section>
           )}
+
+          {/* VUE PLAYING : L'écran de jeu (On fera l'interface complète plus tard !) */}
+          {view === "playing" && roomState && (
+            <motion.section key="playing" className="flex flex-1 flex-col justify-center items-center text-center bg-white/80 rounded-[2rem] p-6 shadow-sm backdrop-blur-md" {...pageTransition}>
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">C'est parti ! 🚀</h2>
+              <p className="text-slate-600 font-medium text-lg">Préparez-vous à répondre...</p>
+              
+              <div className="mt-8 p-4 bg-violet-100 rounded-xl">
+                <p className="text-sm font-bold text-violet-800">
+                  {roomState.game_data?.questions?.length} questions ont été tirées au sort !
+                </p>
+              </div>
+            </motion.section>
+          )}
+
         </AnimatePresence>
       </main>
     </div>
