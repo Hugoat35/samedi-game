@@ -27,7 +27,7 @@ import {
 } from "@/lib/local-session";
 import { mockLobbyStore } from "@/lib/mock-lobby-store";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
-
+import type { QuestionTheme } from "@/lib/quiz-bank"; 
 // IMPORT DU NOUVEAU JEU !
 import QuizGame from "@/components/quiz-game";
 import WordleGame from "@/components/wordle-game";
@@ -382,7 +382,8 @@ export default function GameApp() {
       const result =
         selectedGame === "wordle-team"
           ? await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax)
-          : await startGameRemote(roomCode, questionCount);
+          // ICI : On envoie l'objet themeCounts au lieu d'un simple nombre
+          : await startGameRemote(roomCode, themeCounts as any); 
       setBusy(false);
 
       if (!result.ok) {
@@ -393,6 +394,19 @@ export default function GameApp() {
       setView("playing");
     }
   };
+
+
+// Le réglage par défaut (ex: 4 questions de chaque + 1 Mini-Bac = 17 questions au total)
+const [themeCounts, setThemeCounts] = useState<Record<QuestionTheme, number>>({
+  "Géographie": 4,
+  "Sciences": 4,
+  "Histoire": 4,
+  "Culture G": 4,
+  "Mini-Bac": 1
+});
+
+// Calcul du total en temps réel
+const totalQuestions = Object.values(themeCounts).reduce((a, b) => a + b, 0);
 
   const handleReconnectToGame = useCallback(async () => {
     if (!reconnectOffer || !remote) return;
@@ -813,23 +827,37 @@ export default function GameApp() {
                             />
                           </>
                         ) : (
-                          <>
-                            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                              <span className="font-semibold text-slate-600">Questions</span>
-                              <span className="font-mono text-lg font-bold text-violet-600 tabular-nums sm:text-xl">
-                                {questionCount}
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min="3"
-                              max="50"
-                              step="1"
-                              value={questionCount}
-                              onChange={(e) => setQuestionCount(Number(e.target.value))}
-                              className="mb-1 w-full accent-violet-600"
-                            />
-                          </>
+                                                <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-slate-600 text-sm">Composition ({totalQuestions} q.)</span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                            {(Object.keys(themeCounts) as QuestionTheme[]).map((theme) => (
+                              <div key={theme} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 shadow-sm">
+                                <span className="text-xs font-bold text-slate-700 sm:text-sm">{theme}</span>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setThemeCounts((prev) => ({ ...prev, [theme]: Math.max(0, prev[theme] - 1) }))}
+                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 transition hover:bg-rose-100 hover:text-rose-600"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="w-4 text-center text-sm font-bold tabular-nums text-slate-800">
+                                    {themeCounts[theme]}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setThemeCounts((prev) => ({ ...prev, [theme]: prev[theme] + 1 }))}
+                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 transition hover:bg-violet-100 hover:text-violet-600"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                         )}
 
                         {startError && (

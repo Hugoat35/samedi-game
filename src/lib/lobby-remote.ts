@@ -1,6 +1,6 @@
 import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
-import { getRandomQuestions } from "./quiz-bank";
+import { getRandomQuestionsByTheme } from "./quiz-bank";
 
 export type { Player };
 
@@ -387,11 +387,11 @@ export async function submitAnswerRemote(
   return { ok: false, error: lastError };
 }
 
-export async function startGameRemote(roomCode: string, questionCount: number) {
+export async function startGameRemote(roomCode: string, themeCounts: Record<string, number>) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  const selectedQuestions = getRandomQuestions(questionCount);
+  const selectedQuestions = getRandomQuestionsByTheme(themeCounts);
 
   const { error } = await supabase
     .from("rooms")
