@@ -382,8 +382,8 @@ export default function GameApp() {
       const result =
         selectedGame === "wordle-team"
           ? await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax)
-          // ICI : On envoie l'objet themeCounts au lieu d'un simple nombre
-          : await startGameRemote(roomCode, themeCounts as any); 
+          // ICI : On envoie la jauge ET la liste des thèmes activés
+          : await startGameRemote(roomCode, questionCount, activeThemes);
       setBusy(false);
 
       if (!result.ok) {
@@ -396,17 +396,16 @@ export default function GameApp() {
   };
 
 
-// Le réglage par défaut (ex: 4 questions de chaque + 1 Mini-Bac = 17 questions au total)
-const [themeCounts, setThemeCounts] = useState<Record<QuestionTheme, number>>({
-  "Géographie": 4,
-  "Sciences": 4,
-  "Histoire": 4,
-  "Culture G": 4,
-  "Mini-Bac": 1
-});
+// --- NOUVEAUX STATES (Thèmes ON/OFF) ---
+  const ALL_THEMES: QuestionTheme[] = ["Géographie", "Sciences", "Histoire", "Culture G", "Sport", "Dessin animé", "Mini-Bac"];
+  const [activeThemes, setActiveThemes] = useState<QuestionTheme[]>(ALL_THEMES);
+  // (La jauge "questionCount" est déjà déclarée plus haut dans ton fichier !)
 
-// Calcul du total en temps réel
-const totalQuestions = Object.values(themeCounts).reduce((a, b) => a + b, 0);
+  const toggleTheme = (theme: QuestionTheme) => {
+    setActiveThemes(prev => 
+      prev.includes(theme) ? prev.filter(t => t !== theme) : [...prev, theme]
+    );
+  };
 
   const handleReconnectToGame = useCallback(async () => {
     if (!reconnectOffer || !remote) return;
@@ -827,50 +826,58 @@ const totalQuestions = Object.values(themeCounts).reduce((a, b) => a + b, 0);
                             />
                           </>
                         ) : (
-                                                <div className="flex flex-col gap-2">
-                                                      <div className="flex items-center justify-between mb-1 px-1">
-                                <span className="font-semibold text-slate-600 text-sm">Composition ({totalQuestions} q.)</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setThemeCounts({
-                                      "Géographie": Math.floor(Math.random() * 6),
-                                      "Sciences": Math.floor(Math.random() * 6),
-                                      "Histoire": Math.floor(Math.random() * 6),
-                                      "Culture G": Math.floor(Math.random() * 5) + 1,
-                                      "Mini-Bac": Math.floor(Math.random() * 3),
-                                    });
-                                  }}
-                                  className="flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-[10px] font-bold text-violet-700 transition hover:bg-violet-200 hover:scale-105 active:scale-95 sm:text-xs"
-                                >
-                                  🎲 Aléatoire
-                                </button>
-                              </div>
-                          <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
-                            {(Object.keys(themeCounts) as QuestionTheme[]).map((theme) => (
-                              <div key={theme} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 shadow-sm">
-                                <span className="text-xs font-bold text-slate-700 sm:text-sm">{theme}</span>
-                                <div className="flex items-center gap-3">
+                              <div className="flex flex-col gap-2">
+                          {/* JAUGE DE QUESTIONS */}
+                          <div className="flex items-center justify-between gap-3 text-xs sm:text-sm mb-1 mt-2">
+                            <span className="font-semibold text-slate-600">Nombre de questions</span>
+                            <span className="font-mono text-lg font-bold text-violet-600 tabular-nums sm:text-xl">
+                              {questionCount}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="3"
+                            max="40"
+                            step="1"
+                            value={questionCount}
+                            onChange={(e) => setQuestionCount(Number(e.target.value))}
+                            className="mb-4 w-full accent-violet-600"
+                          />
+
+                          {/* SÉLECTEUR DE THÈMES ON/OFF */}
+                          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-bold text-slate-700 sm:text-sm">Thèmes activés</span>
+                              <button
+                                type="button"
+                                onClick={() => setActiveThemes(ALL_THEMES)}
+                                className="text-[10px] text-violet-600 hover:underline font-bold"
+                              >
+                                Tout cocher
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ALL_THEMES.map((theme) => {
+                                const isActive = activeThemes.includes(theme);
+                                return (
                                   <button
+                                    key={theme}
                                     type="button"
-                                    onClick={() => setThemeCounts((prev) => ({ ...prev, [theme]: Math.max(0, prev[theme] - 1) }))}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 transition hover:bg-rose-100 hover:text-rose-600"
+                                    onClick={() => toggleTheme(theme)}
+                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border sm:text-xs ${
+                                      isActive 
+                                        ? "bg-violet-100 border-violet-200 text-violet-700 shadow-sm" 
+                                        : "bg-white border-slate-200 text-slate-400 opacity-60 hover:opacity-100"
+                                    }`}
                                   >
-                                    -
+                                    {isActive ? "✓" : "+"} {theme}
                                   </button>
-                                  <span className="w-4 text-center text-sm font-bold tabular-nums text-slate-800">
-                                    {themeCounts[theme]}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setThemeCounts((prev) => ({ ...prev, [theme]: prev[theme] + 1 }))}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 transition hover:bg-violet-100 hover:text-violet-600"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                                );
+                              })}
+                            </div>
+                            {activeThemes.length === 0 && (
+                              <p className="text-xs text-red-500 font-bold mt-1 text-center">⚠️ Active au moins un thème !</p>
+                            )}
                           </div>
                         </div>
                         )}
@@ -883,7 +890,7 @@ const totalQuestions = Object.values(themeCounts).reduce((a, b) => a + b, 0);
 
                         <button
                           onClick={handleStartGame}
-                          disabled={busy || players.length < 1}
+                          disabled={busy || players.length < 1 || activeThemes.length === 0}
                           className="flex w-full items-center justify-center rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50 sm:rounded-2xl sm:py-3.5 sm:text-base"
                         >
                           {busy ? "Démarrage…" : "Lancer la partie"}

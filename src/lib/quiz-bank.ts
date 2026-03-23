@@ -11,7 +11,7 @@ export type QuestionType =
   | "geo_shape";
 
 // NOUVEAU : Les thèmes pour le filtre de la partie
-export type QuestionTheme = "Géographie" | "Sciences" | "Histoire" | "Culture G" | "Mini-Bac";
+export type QuestionTheme = "Géographie" | "Sciences" | "Histoire" | "Culture G" | "Mini-Bac" | "Sport" | "Dessin animé";
 
 export interface QuizQuestion {
   id: string;
@@ -150,6 +150,21 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "tf34", type: "true_false", theme: "Sciences", question: "Les neurones sont les seules cellules du corps qui ne se divisent jamais.", answer: "Faux", options: ["Vrai", "Faux"], points: 90 },
   { id: "tf35", type: "true_false", theme: "Sciences", question: "Un éclair est cinq fois plus chaud que la surface du Soleil.", answer: "Vrai", options: ["Vrai", "Faux"], points: 80 },
   { id: "tf36", type: "true_false", theme: "Sciences", question: "Les veines transportent toujours du sang pauvre en oxygène.", answer: "Faux", options: ["Vrai", "Faux"], points: 100 },
+  { id: "tf-sp1", type: "true_false", theme: "Sport", question: "Le tennis de table est un sport olympique.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp2", type: "true_false", theme: "Sport", question: "Au tennis, le point qui vient après 30 est 45.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp3", type: "true_false", theme: "Sport", question: "Un match de rugby à XV dure 80 minutes.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-da1", type: "true_false", theme: "Dessin animé", question: "Pikachu est un Pokémon de type Électrik.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-da2", type: "true_false", theme: "Dessin animé", question: "Dans 'Toy Story', le dinosaure vert s'appelle Woody.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp4", type: "true_false", theme: "Sport", question: "Usain Bolt détient le record du monde du 100m.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp5", type: "true_false", theme: "Sport", question: "Au basket-ball, un tir réussi de très loin vaut 4 points.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp6", type: "true_false", theme: "Sport", question: "Le Tour de France est la compétition cycliste la plus suivie au monde.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-sp7", type: "true_false", theme: "Sport", question: "Une partie de bowling se compose de 15 manches (frames).", answer: "Faux", options: ["Vrai", "Faux"], points: 60 },
+  { id: "tf-sp8", type: "true_false", theme: "Sport", question: "La ceinture noire est la ceinture la plus élevée que l'on puisse atteindre au judo.", answer: "Faux", options: ["Vrai", "Faux"], points: 80 }, // C'est la rouge (largement méconnu !)
+  { id: "tf-da3", type: "true_false", theme: "Dessin animé", question: "Homer Simpson travaille dans une centrale nucléaire.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-da4", type: "true_false", theme: "Dessin animé", question: "Mickey Mouse devait initialement s'appeler Mortimer.", answer: "Vrai", options: ["Vrai", "Faux"], points: 70 },
+  { id: "tf-da5", type: "true_false", theme: "Dessin animé", question: "Dans 'La Reine des Neiges', le bonhomme de neige s'appelle Sven.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 }, // Sven c'est le renne, Olaf le bonhomme de neige
+  { id: "tf-da6", type: "true_false", theme: "Dessin animé", question: "Shrek est un ogre de couleur bleue.", answer: "Faux", options: ["Vrai", "Faux"], points: 50 },
+  { id: "tf-da7", type: "true_false", theme: "Dessin animé", question: "Bob l'éponge travaille au Crabe Croustillant.", answer: "Vrai", options: ["Vrai", "Faux"], points: 50 },
 
   // 🔵 QCM
   { id: "qcm1", type: "qcm", theme: "Géographie", question: "Quelle est la capitale de l'Australie ?", answer: "Canberra", options: ["Sydney", "Melbourne", "Canberra", "Perth"], points: 100 },
@@ -193,6 +208,20 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "qcm39", type: "qcm", theme: "Géographie", question: "Quel fleuve traverse le plus grand nombre de pays ?", answer: "Le Danube", options: ["Le Nil", "L'Amazone", "Le Danube", "Le Rhin"], points: 120 },
   { id: "qcm40", type: "qcm", theme: "Histoire", question: "Quelle était la capitale de l'Empire Inca ?", answer: "Cuzco", options: ["Machu Picchu", "Lima", "Quito", "Cuzco"], points: 100 },
   { id: "qcm41", type: "qcm", theme: "Géographie", question: "Quel pays possède le plus d'îles au monde ?", answer: "La Suède", options: ["L'Indonésie", "La Grèce", "Le Canada", "La Suède"], points: 150 },
+  { id: "qcm-sp1", type: "qcm", theme: "Sport", question: "Dans quel sport s'illustre Rafael Nadal ?", answer: "Tennis", options: ["Football", "Tennis", "Golf", "Basket-ball"], points: 100 },
+  { id: "qcm-sp2", type: "qcm", theme: "Sport", question: "Quelle est la durée réglementaire d'un match de football (sans prolongations) ?", answer: "90 minutes", options: ["60 minutes", "80 minutes", "90 minutes", "120 minutes"], points: 100 },
+  { id: "qcm-da1", type: "qcm", theme: "Dessin animé", question: "Comment s'appelle le lionceau héros du film 'Le Roi Lion' ?", answer: "Simba", options: ["Mufasa", "Scar", "Kovu", "Simba"], points: 100 },
+  { id: "qcm-da2", type: "qcm", theme: "Dessin animé", question: "Dans le manga 'Naruto', quel est le rêve du personnage principal ?", answer: "Devenir Hokage", options: ["Devenir pirate", "Trouver les boules de cristal", "Devenir Hokage", "Devenir un super saiyan"], points: 100 },
+  { id: "qcm-sp3", type: "qcm", theme: "Sport", question: "Quel pays a remporté la Coupe du Monde de football 2022 ?", answer: "Argentine", options: ["France", "Brésil", "Croatie", "Argentine"], points: 80 },
+  { id: "qcm-sp4", type: "qcm", theme: "Sport", question: "Combien de joueurs composent une équipe de volley-ball sur le terrain ?", answer: "6", options: ["5", "6", "7", "11"], points: 100 },
+  { id: "qcm-sp5", type: "qcm", theme: "Sport", question: "De quelle couleur est le maillot du leader du classement général sur le Tour de France ?", answer: "Jaune", options: ["Vert", "Jaune", "Blanc à pois rouges", "Rose"], points: 80 },
+  { id: "qcm-sp6", type: "qcm", theme: "Sport", question: "Dans quel sport utilise-t-on le terme 'Home Run' ?", answer: "Baseball", options: ["Cricket", "Football Américain", "Baseball", "Hockey"], points: 100 },
+  { id: "qcm-sp7", type: "qcm", theme: "Sport", question: "Quelle est la discipline de Teddy Riner ?", answer: "Judo", options: ["Karaté", "Boxe", "Lutte", "Judo"], points: 80 },
+  { id: "qcm-da3", type: "qcm", theme: "Dessin animé", question: "Quel animal est le maître Shifu dans Kung Fu Panda ?", answer: "Un panda roux", options: ["Un panda roux", "Un raton laveur", "Un renard", "Un lémurien"], points: 120 },
+  { id: "qcm-da4", type: "qcm", theme: "Dessin animé", question: "Quel est le nom de la méchante dans 'La Petite Sirène' ?", answer: "Ursula", options: ["Maléfique", "Cruella", "Ursula", "Gothel"], points: 100 },
+  { id: "qcm-da5", type: "qcm", theme: "Dessin animé", question: "Dans quel village ninja vit Naruto ?", answer: "Konoha", options: ["Suna", "Kiri", "Konoha", "Iwa"], points: 100 },
+  { id: "qcm-da6", type: "qcm", theme: "Dessin animé", question: "De quel pays vient le célèbre studio d'animation Ghibli ?", answer: "Japon", options: ["Corée du Sud", "Chine", "Japon", "États-Unis"], points: 80 },
+  { id: "qcm-da7", type: "qcm", theme: "Dessin animé", question: "Comment s'appellent les petites créatures jaunes dans 'Moi, moche et méchant' ?", answer: "Les Minions", options: ["Les Rabbids", "Les Minions", "Les Tic-Tacs", "Les Oompa Loompas"], points: 80 },
 
   // 🟠 ESTIMATION / JUSTE PRIX
   { id: "est1", type: "estimation", theme: "Culture G", question: "Combien pèse la Tour Eiffel (en tonnes) ?", answer: 10100, points: 100 },
@@ -236,6 +265,20 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "est39", type: "estimation", theme: "Sciences", question: "Combien de battements de cœur un humain fait-il en moyenne par minute au repos ?", answer: 70, points: 50 },
   { id: "est40", type: "estimation", theme: "Sciences", question: "Quelle est la température du zéro absolu (en degrés Celsius) ?", answer: -273, points: 150 },
   { id: "est41", type: "estimation", theme: "Sciences", question: "Combien de vertèbres compose la colonne dorsale humaine ?", answer: 33, points: 120 },
+  { id: "est-sp1", type: "estimation", theme: "Sport", question: "Combien de kilomètres fait un marathon (arrondi à l'entier) ?", answer: 42, points: 150 },
+  { id: "est-sp2", type: "estimation", theme: "Sport", question: "Combien de joueurs composent une équipe de rugby à XV sur le terrain ?", answer: 15, points: 100 },
+  { id: "est-da1", type: "estimation", theme: "Dessin animé", question: "Combien y a-t-il de Dalmatiens dans le célèbre dessin animé de Disney ?", answer: 101, points: 100 },
+  { id: "est-da2", type: "estimation", theme: "Dessin animé", question: "Combien de boules de cristal magiques faut-il réunir dans Dragon Ball ?", answer: 7, points: 100 },
+  { id: "est-sp3", type: "estimation", theme: "Sport", question: "Quelle est la hauteur officielle d'un panier de basket en NBA (en centimètres) ?", answer: 305, points: 150 },
+  { id: "est-sp4", type: "estimation", theme: "Sport", question: "Combien de trous compte un parcours de golf de compétition complet ?", answer: 18, points: 100 },
+  { id: "est-sp5", type: "estimation", theme: "Sport", question: "Combien de quilles doit-on faire tomber au bowling en un seul lancer pour faire un strike ?", answer: 10, points: 80 },
+  { id: "est-sp6", type: "estimation", theme: "Sport", question: "En kilomètres, quelle est la distance d'un semi-marathon (arrondi à l'entier) ?", answer: 21, points: 150 },
+  { id: "est-sp7", type: "estimation", theme: "Sport", question: "Combien de minutes dure un quart-temps en NBA ?", answer: 12, points: 120 },
+  { id: "est-da3", type: "estimation", theme: "Dessin animé", question: "Combien d'émotions principales y a-t-il dans la tête de Riley dans le film 'Vice-Versa' (le 1er film) ?", answer: 5, points: 100 },
+  { id: "est-da4", type: "estimation", theme: "Dessin animé", question: "Combien de doigts possède un Minion sur une seule main ?", answer: 3, points: 120 },
+  { id: "est-da5", type: "estimation", theme: "Dessin animé", question: "Combien de fées marraines se penchent sur le berceau de La Belle au Bois Dormant ?", answer: 3, points: 100 },
+  { id: "est-da6", type: "estimation", theme: "Dessin animé", question: "Combien de nains accompagnent Blanche-Neige ?", answer: 7, points: 80 },
+  { id: "est-da7", type: "estimation", theme: "Dessin animé", question: "Combien de têtes possède le dragon 'Touffu' dans l'univers de Harry Potter ?", answer: 3, points: 100 }, // Clin d'oeil pop culture
 
   // 🟣 QUESTIONS OUVERTES TEXTE
   { id: "op1", type: "open", theme: "Géographie", question: "Quelle est la capitale du Japon ?", answer: "Tokyo", points: 100 },
@@ -274,6 +317,20 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "op34", type: "open", theme: "Géographie", question: "Dans quel pays se trouve le mont Kilimandjaro ?", answer: "Tanzanie", points: 120 },
   { id: "op35", type: "open", theme: "Sciences", question: "Quel est le nom du pigment qui donne la couleur à la peau ?", answer: "Mélanine", points: 100 },
   { id: "op36", type: "open", theme: "Sciences", question: "Quel acide trouve-t-on en abondance dans l'estomac ?", answer: "Chlorhydrique", points: 130 },
+  { id: "op-sp1", type: "open", theme: "Sport", question: "Quel sport se joue avec un club, une petite balle blanche et des trous ?", answer: "Golf", points: 80 },
+  { id: "op-sp2", type: "open", theme: "Sport", question: "Quelle nation les 'All Blacks' représentent-ils au rugby ?", answer: "Nouvelle-Zélande", points: 120 },
+  { id: "op-da1", type: "open", theme: "Dessin animé", question: "Comment s'appelle l'ogre vert des studios DreamWorks ?", answer: "Shrek", points: 80 },
+  { id: "op-da2", type: "open", theme: "Dessin animé", question: "Quel est le nom du célèbre petit chien blanc de Tintin ?", answer: "Milou", points: 80 },
+  { id: "op-sp3", type: "open", theme: "Sport", question: "Comment s'appelle le célèbre footballeur argentin vainqueur de la Coupe du Monde 2022 ?", answer: "Messi", answerAliases: ["Lionel Messi", "Leo Messi"], points: 80 },
+  { id: "op-sp4", type: "open", theme: "Sport", question: "Dans quelle ville se déroule le grand tournoi de tennis sur terre battue de Roland-Garros ?", answer: "Paris", points: 80 },
+  { id: "op-sp5", type: "open", theme: "Sport", question: "Quel art martial japonais se pratique en saisissant le kimono (judogi) de l'adversaire ?", answer: "Judo", points: 100 },
+  { id: "op-sp6", type: "open", theme: "Sport", question: "Quel accessoire tenu à la main utilise-t-on pour frapper le volant au badminton ?", answer: "Raquette", answerAliases: ["Une raquette"], points: 80 },
+  { id: "op-sp7", type: "open", theme: "Sport", question: "Quel est le sport pratiqué par la légende américaine Michael Jordan ?", answer: "Basket", answerAliases: ["Basketball", "Basket-ball", "Le basket"], points: 80 },
+  { id: "op-da3", type: "open", theme: "Dessin animé", question: "Comment s'appelle le chien de Mickey Mouse ?", answer: "Pluto", points: 80 },
+  { id: "op-da4", type: "open", theme: "Dessin animé", question: "Quel aliment mange Popeye pour devenir super fort ?", answer: "Epinards", answerAliases: ["Des épinards", "Épinards"], points: 80 },
+  { id: "op-da5", type: "open", theme: "Dessin animé", question: "Comment s'appelle la célèbre souris mâle qui accompagne souvent Jerry ?", answer: "Tom", answerAliases: ["Tom le chat"], points: 80 },
+  { id: "op-da6", type: "open", theme: "Dessin animé", question: "Comment s'appelle le meilleur ami (une étoile de mer) de Bob l'éponge ?", answer: "Patrick", answerAliases: ["Patrick l'étoile de mer"], points: 80 },
+  { id: "op-da7", type: "open", theme: "Dessin animé", question: "Quel est le prénom de l'héroïne Disney qui a de très longs cheveux magiques ?", answer: "Raiponce", points: 80 },
 
   // 🔴 DATES
   { id: "date1", type: "date", theme: "Histoire", question: "En quelle année le Titanic a-t-il coulé ?", answer: 1912, points: 150 },
@@ -312,53 +369,59 @@ export const QUIZ_BANK: QuizQuestion[] = [
   { id: "date34", type: "date", theme: "Histoire", question: "En quelle année s'est terminé l'Empire Romain d'Occident ?", answer: 476, points: 150 },
   { id: "date35", type: "date", theme: "Histoire", question: "En quelle année a été lancé le premier satellite artificiel, Spoutnik ?", answer: 1957, points: 150 },
   { id: "date36", type: "date", theme: "Sciences", question: "En quelle année la structure de l'ADN a-t-elle été découverte ?", answer: 1953, points: 180 },
+  { id: "date-sp1", type: "date", theme: "Sport", question: "En quelle année ont eu lieu les Jeux Olympiques d'été à Pékin ?", answer: 2008, points: 180 },
+  { id: "date-sp2", type: "date", theme: "Sport", question: "En quelle année l'équipe de France de football a gagné sa deuxième étoile (Coupe du monde) ?", answer: 2018, points: 150 },
+  { id: "date-da1", type: "date", theme: "Dessin animé", question: "En quelle année est sorti le tout premier film d'animation 'Toy Story' ?", answer: 1995, points: 200 },
+  { id: "date-da2", type: "date", theme: "Dessin animé", question: "En quelle année Mickey Mouse a-t-il fait sa toute première apparition à l'écran ?", answer: 1928, points: 250 },
+  { id: "date-sp3", type: "date", theme: "Sport", question: "En quelle année ont eu lieu les premiers Jeux Olympiques de l'ère moderne (à Athènes) ?", answer: 1896, points: 250 },
+  { id: "date-sp4", type: "date", theme: "Sport", question: "En quelle année a eu lieu la toute première édition du Tour de France cycliste ?", answer: 1903, points: 200 },
+  { id: "date-sp5", type: "date", theme: "Sport", question: "En quelle année l'équipe de France a-t-elle remporté sa PREMIÈRE Coupe du Monde de football ?", answer: 1998, points: 150 },
+  { id: "date-sp6", type: "date", theme: "Sport", question: "En quelle année la ligue américaine de basket-ball (NBA) a-t-elle été créée ?", answer: 1946, points: 200 },
+  { id: "date-sp7", type: "date", theme: "Sport", question: "En quelle année Usain Bolt a-t-il pulvérisé le record du monde du 100m en 9.58 secondes ?", answer: 2009, points: 180 },
+  { id: "date-da3", type: "date", theme: "Dessin animé", question: "En quelle année est sorti 'Blanche-Neige', le tout premier long métrage d'animation Disney ?", answer: 1937, points: 250 },
+  { id: "date-da4", type: "date", theme: "Dessin animé", question: "En quelle année a été diffusé le tout premier épisode régulier des Simpson aux États-Unis ?", answer: 1989, points: 200 },
+  { id: "date-da5", type: "date", theme: "Dessin animé", question: "En quelle année est sorti au cinéma le premier film 'Shrek' ?", answer: 2001, points: 180 },
+  { id: "date-da6", type: "date", theme: "Dessin animé", question: "En quelle année le célèbre manga 'Dragon Ball' a-t-il été publié pour la toute première fois ?", answer: 1984, points: 200 },
+  { id: "date-da7", type: "date", theme: "Dessin animé", question: "En quelle année est sorti le magnifique chef-d'œuvre de Ghibli 'Le Voyage de Chihiro' ?", answer: 2001, points: 180 },
 
   ...GEO_FLAG_QUESTIONS,
   ...GEO_SHAPE_QUESTIONS,
 ];
 
-// --- GÉNÉRATEUR DYNAMIQUE PAR THÈME ---
-export function getRandomQuestionsByTheme(themeCounts: Record<QuestionTheme, number>): QuizQuestion[] {
-  let selected: QuizQuestion[] = [];
+// --- GÉNÉRATEUR DYNAMIQUE PAR THÈME (MODE ON/OFF) ---
+export function getRandomQuestionsByTheme(count: number, activeThemes: QuestionTheme[]): QuizQuestion[] {
+  // 1. On filtre la banque pour ne garder que les questions des thèmes activés
+  const pool = QUIZ_BANK.filter((q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac");
+  const shuffled = shuffle([...pool]);
+  let selected = shuffled.slice(0, count);
 
-  // 1. On pioche le nombre exact demandé pour chaque thème (sauf le Mini-Bac)
-  const themesClassiques: QuestionTheme[] = ["Géographie", "Sciences", "Histoire", "Culture G"];
-  
-  for (const theme of themesClassiques) {
-    const count = themeCounts[theme] || 0;
-    if (count > 0) {
-      // On filtre les questions de ce thème
-      const questionsForTheme = QUIZ_BANK.filter((q) => q.theme === theme);
-      const shuffled = shuffle([...questionsForTheme]);
-      // On prend le nombre demandé (ou tout si le joueur en demande plus qu'on en a)
-      selected.push(...shuffled.slice(0, Math.min(count, questionsForTheme.length)));
+  // 2. LA MAGIE DU MINI-BAC (S'il est activé dans les thèmes)
+  if (activeThemes.includes("Mini-Bac") && count >= 5 && selected.length >= 4) {
+    const numMiniBacs = count >= 15 ? 2 : 1;
+
+    for (let i = 0; i < numMiniBacs; i++) {
+      const randomLetter = MINI_BAC_LETTERS[randomIntBelow(MINI_BAC_LETTERS.length)]!;
+      const shuffledCategories = shuffle([...MINI_BAC_CATEGORIES]).slice(0, 4);
+
+      const miniBacQuestion: QuizQuestion = {
+        id: `minibac-${Date.now()}-${i}-${randomIntBelow(1_000_000_000)}`,
+        type: "minibac",
+        theme: "Mini-Bac",
+        question: `Mini-Bac : Lettre ${randomLetter}`,
+        answer: "vote",
+        points: MINIBAC_POINTS_PER_VALIDATED_CELL,
+        letter: randomLetter,
+        categories: shuffledCategories,
+      };
+
+      // On remplace une question classique vers la fin par le Mini-Bac
+      const replaceIndex = Math.floor(selected.length * 0.6) + i;
+      if (replaceIndex < selected.length) {
+        selected[replaceIndex] = miniBacQuestion;
+      }
     }
   }
 
-  // 2. On mélange toutes les questions classiques pour ne pas avoir 5 "Sciences" de suite
-  selected = shuffle(selected);
-
-  // 3. LA MAGIE DU MINI-BAC (Généré dynamiquement)
-  const miniBacCount = themeCounts["Mini-Bac"] || 0;
-  for (let i = 0; i < miniBacCount; i++) {
-    const randomLetter = MINI_BAC_LETTERS[randomIntBelow(MINI_BAC_LETTERS.length)]!;
-    const shuffledCategories = shuffle([...MINI_BAC_CATEGORIES]).slice(0, 4);
-
-    const miniBacQuestion: QuizQuestion = {
-      id: `minibac-${Date.now()}-${i}-${randomIntBelow(1_000_000_000)}`,
-      type: "minibac",
-      theme: "Mini-Bac",
-      question: `Mini-Bac : Lettre ${randomLetter}`,
-      answer: "vote",
-      points: MINIBAC_POINTS_PER_VALIDATED_CELL,
-      letter: randomLetter,
-      categories: shuffledCategories,
-    };
-
-    // On insère le mini-bac de manière aléatoire parmi les autres questions
-    const insertIndex = randomIntBelow(selected.length + 1);
-    selected.splice(insertIndex, 0, miniBacQuestion);
-  }
-
-  return selected;
+  // 3. On remélange un petit coup pour intégrer le Mini-Bac naturellement
+  return shuffle(selected);
 }

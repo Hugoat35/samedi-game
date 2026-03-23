@@ -387,11 +387,11 @@ export async function submitAnswerRemote(
   return { ok: false, error: lastError };
 }
 
-export async function startGameRemote(roomCode: string, themeCounts: Record<string, number>) {
+export async function startGameRemote(roomCode: string, questionCount: number, activeThemes: string[]) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  const selectedQuestions = getRandomQuestionsByTheme(themeCounts);
+  const selectedQuestions = getRandomQuestionsByTheme(questionCount, activeThemes as any);
 
   const { error } = await supabase
     .from("rooms")
