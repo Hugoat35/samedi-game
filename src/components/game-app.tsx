@@ -828,9 +828,24 @@ const totalQuestions = Object.values(themeCounts).reduce((a, b) => a + b, 0);
                           </>
                         ) : (
                                                 <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-semibold text-slate-600 text-sm">Composition ({totalQuestions} q.)</span>
-                          </div>
+                                                      <div className="flex items-center justify-between mb-1 px-1">
+                                <span className="font-semibold text-slate-600 text-sm">Composition ({totalQuestions} q.)</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setThemeCounts({
+                                      "Géographie": Math.floor(Math.random() * 6),
+                                      "Sciences": Math.floor(Math.random() * 6),
+                                      "Histoire": Math.floor(Math.random() * 6),
+                                      "Culture G": Math.floor(Math.random() * 5) + 1,
+                                      "Mini-Bac": Math.floor(Math.random() * 3),
+                                    });
+                                  }}
+                                  className="flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-[10px] font-bold text-violet-700 transition hover:bg-violet-200 hover:scale-105 active:scale-95 sm:text-xs"
+                                >
+                                  🎲 Aléatoire
+                                </button>
+                              </div>
                           <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
                             {(Object.keys(themeCounts) as QuestionTheme[]).map((theme) => (
                               <div key={theme} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5 shadow-sm">
