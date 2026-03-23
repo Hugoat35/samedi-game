@@ -75,8 +75,9 @@ function bestKeyHints(
 }
 
 function keyButtonClass(mark: string | undefined, disabled: boolean): string {
+  // Le secret est le 'flex-1 max-w-[2rem]' pour rétrécir sans jamais dépasser la taille idéale
   const base =
-    "h-9 min-w-[2rem] rounded-lg border text-sm font-bold shadow-sm transition sm:h-10 sm:min-w-[2.25rem] sm:text-base ";
+    "flex-1 flex items-center justify-center h-9 max-w-[2rem] rounded-lg border text-[11px] font-bold shadow-sm transition sm:h-10 sm:max-w-[2.25rem] sm:text-sm ";
   if (!mark) {
     return (
       base +
@@ -403,8 +404,10 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
         )}
         {err && <p className="text-center text-xs font-semibold text-red-600">{err}</p>}
 
-        <div className="mt-2 flex flex-col gap-1.5">
-          <div className="flex flex-wrap justify-center gap-1">
+        {/* CLAVIER ADAPTATIF */}
+        <div className="mt-2 flex flex-col gap-1.5 sm:gap-2">
+          {/* LIGNE 1 */}
+          <div className="flex w-full justify-center gap-[2px] px-1 sm:gap-1">
             {ROW1.map((k) => (
               <button
                 key={k}
@@ -417,7 +420,8 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap justify-center gap-1">
+          {/* LIGNE 2 */}
+          <div className="flex w-full justify-center gap-[2px] px-1 sm:gap-1">
             {ROW2.map((k) => (
               <button
                 key={k}
@@ -430,12 +434,13 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap justify-center gap-1">
+          {/* LIGNE 3 */}
+          <div className="flex w-full justify-center gap-[2px] px-1 sm:gap-1">
             <button
               type="button"
               disabled={!myTurn || busy}
               onClick={backspace}
-              className="h-9 rounded-lg border border-slate-200 bg-slate-200 px-3 text-xs font-bold text-slate-700 shadow-sm sm:h-10 sm:text-sm"
+              className="flex-[1.5] flex items-center justify-center h-9 max-w-[3rem] rounded-lg border border-slate-200 bg-slate-200 text-xs font-bold text-slate-700 shadow-sm sm:h-10 sm:text-sm sm:max-w-[3.5rem]"
             >
               ⌫
             </button>
