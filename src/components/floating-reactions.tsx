@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 import type { Player } from "@/lib/lobby-types";
 
-const EMOJIS = ["😂", "😱", "🤬", "🧠", "❤️", "🚀"];
+const EMOJIS = ["😂", "🤯", "🤬", "🤨", "😭", "💩"];
 const MESSAGES = ["Bien joué !", "Aïe...", "Vite !", "Je sèche..."];
 
 interface FloatingReactionsProps {

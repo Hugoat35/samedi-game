@@ -1,4 +1,4 @@
--- Plage min/max de longueur choisie par l’hôte (3–7 lettres), tirage aléatoire dans la plage.
+-- Plage min/max de longueur choisie par l’hôte (3–10 lettres), tirage aléatoire dans la plage.
 
 do $$
 declare
@@ -17,7 +17,7 @@ end $$;
 
 alter table public.wordle_dictionary
   add constraint wordle_dictionary_word_len_check
-  check (char_length(word) between 3 and 7 and word = upper(word));
+  check (char_length(word) between 3 and 10 and word = upper(word));
 
 do $$
 declare
@@ -36,27 +36,7 @@ end $$;
 
 alter table public.wordle_secrets
   add constraint wordle_secrets_secret_len_check
-  check (char_length(secret) between 3 and 7 and secret = upper(secret));
-
--- 3 lettres
-insert into public.wordle_dictionary (word) values
-  ('AIR'), ('ARC'), ('BAR'), ('BAS'), ('BEC'), ('BIS'), ('BOX'), ('BUT'), ('CAP'), ('CAS'),
-  ('COQ'), ('CRI'), ('CUE'), ('DON'), ('DUE'), ('DUR'), ('DUO'), ('EAU'), ('FER'), ('FEU'),
-  ('FIL'), ('FIN'), ('GEL'), ('HUE'), ('IRE'), ('JEU'), ('JUS'), ('LAC'), ('LAS'), ('LIT'),
-  ('LOI'), ('LUE'), ('LUX'), ('MER'), ('MIE'), ('NEF'), ('NID'), ('NUE'), ('PIE'), ('PIN'),
-  ('POT'), ('ROI'), ('RUE'), ('SEL'), ('SKI'), ('TEL'), ('TIE'), ('VIE'), ('VIN'), ('ZEN')
-on conflict (word) do nothing;
-
--- 4 lettres
-insert into public.wordle_dictionary (word) values
-  ('AIDE'), ('AIRE'), ('ANSE'), ('AUBE'), ('AUTO'), ('BANC'), ('BASE'), ('BLEU'), ('BLOC'),
-  ('BOIS'), ('BOND'), ('BORD'), ('BRAS'), ('CAGE'), ('CAFE'), ('CART'), ('CASE'), ('CITE'),
-  ('COTE'), ('COUP'), ('CUBE'), ('DAME'), ('DENT'), ('DUNE'), ('ECHO'), ('ELUE'), ('FACE'),
-  ('FILM'), ('FINE'), ('FOND'), ('GARE'), ('GOLF'), ('HALO'), ('HOTE'), ('JADE'), ('JOUE'),
-  ('LACE'), ('LAME'), ('LION'), ('LOUE'), ('LUCE'), ('LUNE'), ('MALE'), ('MINE'), ('NAGE'),
-  ('NICE'), ('NORD'), ('NOTE'), ('ORAL'), ('PALE'), ('PAVE'), ('PORT'), ('RAGE'), ('SAUT'),
-  ('TUBE'), ('VENT'), ('ZONE')
-on conflict (word) do nothing;
+  check (char_length(secret) between 3 and 10 and secret = upper(secret));
 
 create or replace function public.wordle_feedback(secret text, guess text)
 returns text[]
@@ -74,8 +54,8 @@ declare
   j int;
 begin
   n := length(s);
-  if n < 3 or n > 7 or length(g) <> n then
-    if n between 3 and 7 then
+  if n < 3 or n > 10 or length(g) <> n then
+    if n between 3 and 10 then
       return array_fill('X'::text, ARRAY[n]);
     end if;
     return array_fill('X'::text, ARRAY[greatest(length(g), length(s), 1)]);
@@ -149,8 +129,8 @@ begin
     return jsonb_build_object('ok', false, 'error', 'no_players');
   end if;
 
-  a := greatest(3, least(coalesce(p_word_len_min, 5), 7));
-  b := greatest(3, least(coalesce(p_word_len_max, 5), 7));
+  a := greatest(3, least(coalesce(p_word_len_min, 5), 10));
+  b := greatest(3, least(coalesce(p_word_len_max, 5), 10));
   wmin := least(a, b);
   wmax := greatest(a, b);
 
@@ -176,9 +156,9 @@ begin
     'status', 'playing',
     'last_revealed_word', null,
     'last_round_guesses', null,
-    'win_points', 200,
+    'win_points', 50,
     'green_points', 50,
-    'yellow_points', 20,
+    'yellow_points', 15,
     'word_length', char_length(sec),
     'word_len_min', wmin,
     'word_len_max', wmax
@@ -214,7 +194,6 @@ declare
   w jsonb;
   secret text;
   guesses jsonb;
-  prior int[];
   gi int;
   j int;
   fb text[];
@@ -235,16 +214,16 @@ declare
   new_guess jsonb;
   scores jsonb;
   f text;
-  prior_g int;
   won boolean;
   next_secret text;
   new_ord text[];
-  row_t text;
-  pos int;
   n int;
   w_min int;
   w_max int;
   tmp int;
+  row_char text;
+  prior_green boolean[];
+  prior_letters text := '';
 begin
   select game_data into gd from public.rooms where code = p_code for update;
   if gd is null then
@@ -266,7 +245,7 @@ begin
   end if;
 
   n := length(secret);
-  prior := array_fill(0, ARRAY[n]);
+  prior_green := array_fill(false, ARRAY[n]);
 
   if length(g_word) <> n or g_word !~ '^[A-Z]+$' then
     return jsonb_build_object('ok', false, 'error', 'bad_length');
@@ -289,14 +268,35 @@ begin
     return jsonb_build_object('ok', false, 'error', 'not_your_turn');
   end if;
 
+  if w ? 'hint_letters' then
+    for j in 0..(n-1) loop
+      row_char := w->'hint_letters'->>j;
+      if row_char is not null and row_char <> '' then
+        prior_green[j+1] := true;
+        if position(row_char in prior_letters) = 0 then
+          prior_letters := prior_letters || row_char;
+        end if;
+      end if;
+    end loop;
+  end if;
+
   guesses := coalesce(w->'guesses', '[]'::jsonb);
 
   if coalesce(jsonb_array_length(guesses), 0) > 0 then
     for gi in 0..(jsonb_array_length(guesses) - 1) loop
-      pos := 1;
-      for row_t in select * from jsonb_array_elements_text((guesses->gi)->'feedback') loop
-        prior[pos] := greatest(prior[pos], public.wordle_fb_rank(row_t));
-        pos := pos + 1;
+      for j in 1..n loop
+        f := (guesses->gi)->'feedback'->>(j-1);
+        row_char := substr((guesses->gi)->>'word', j, 1);
+        if f = 'G' then
+          prior_green[j] := true;
+          if position(row_char in prior_letters) = 0 then
+            prior_letters := prior_letters || row_char;
+          end if;
+        elsif f = 'Y' then
+          if position(row_char in prior_letters) = 0 then
+            prior_letters := prior_letters || row_char;
+          end if;
+        end if;
       end loop;
     end loop;
   end if;
@@ -307,17 +307,29 @@ begin
   yellow_bonus := 0;
   for j in 1..n loop
     f := fb[j];
-    prior_g := prior[j];
-    if f = 'G' and prior_g < 3 then
-      green_bonus := green_bonus + 1;
-    elsif f = 'Y' and prior_g < 2 then
-      yellow_bonus := yellow_bonus + 1;
+    row_char := substr(g_word, j, 1);
+    if f = 'G' then
+      if prior_green[j] = false then
+        green_bonus := green_bonus + 1;
+        prior_green[j] := true;
+      end if;
+      if position(row_char in prior_letters) = 0 then
+        prior_letters := prior_letters || row_char;
+      end if;
+    elsif f = 'Y' then
+      if position(row_char in prior_letters) = 0 then
+        yellow_bonus := yellow_bonus + 1;
+        prior_letters := prior_letters || row_char;
+      end if;
     end if;
   end loop;
 
   win_pts := coalesce((w->>'win_points')::int, 200);
   green_pts := coalesce((w->>'green_points')::int, 50);
   yellow_pts := coalesce((w->>'yellow_points')::int, 20);
+
+  line_pts := green_bonus * green_pts + yellow_bonus * yellow_pts;
+  scores := coalesce(gd->'scores', '{}'::jsonb);
 
   won := true;
   for j in 1..n loop
@@ -326,9 +338,6 @@ begin
       exit;
     end if;
   end loop;
-
-  line_pts := green_bonus * green_pts + yellow_bonus * yellow_pts;
-  scores := coalesce(gd->'scores', '{}'::jsonb);
 
   if won then
     scores := jsonb_set(
@@ -385,8 +394,8 @@ begin
 
     w_min := coalesce((w->>'word_len_min')::int, (w->>'word_length')::int);
     w_max := coalesce((w->>'word_len_max')::int, (w->>'word_length')::int);
-    w_min := greatest(3, least(coalesce(w_min, n), 7));
-    w_max := greatest(3, least(coalesce(w_max, n), 7));
+    w_min := greatest(3, least(coalesce(w_min, n), 10));
+    w_max := greatest(3, least(coalesce(w_max, n), 10));
     if w_min > w_max then
       tmp := w_min;
       w_min := w_max;

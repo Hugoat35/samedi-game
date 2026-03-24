@@ -39,7 +39,7 @@ function normalizeWord(raw: string): string | null {
     .replace(/\p{M}/gu, "")
     .replace(/[^a-zA-Z]/g, "")
     .toUpperCase();
-  if (s.length < 3 || s.length > 7) return null;
+  if (s.length < 3 || s.length > 10) return null;
   if (!/^[A-Z]+$/.test(s)) return null;
   return s;
 }

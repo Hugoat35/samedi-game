@@ -118,9 +118,9 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
   const winPts = Number(w.win_points ?? 200);
   const greenPts = Number(w.green_points ?? 50);
   const yellowPts = Number(w.yellow_points ?? 20);
-  const wordLen = Math.min(7, Math.max(3, Number(w.word_length ?? 5)));
-  const lenMin = Math.min(7, Math.max(3, Number(w.word_len_min ?? w.word_length ?? 5)));
-  const lenMax = Math.min(7, Math.max(3, Number(w.word_len_max ?? w.word_length ?? 5)));
+  const wordLen = Math.min(10, Math.max(3, Number(w.word_length ?? 5)));
+  const lenMin = Math.min(10, Math.max(3, Number(w.word_len_min ?? w.word_length ?? 5)));
+  const lenMax = Math.min(10, Math.max(3, Number(w.word_len_max ?? w.word_length ?? 5)));
 
   const currentTurnId = playerOrder[turnIndex] ?? null;
   const currentTurnPlayer = useMemo(
