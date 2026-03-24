@@ -12,6 +12,7 @@ import {
   joinRoomRemote,
   leaveRoomRemote,
   reconnectPlayerRemote,
+  returnToLobbyRemote,
   startGameRemote,
   startWordleGameRemote,
 } from "@/lib/lobby-remote";
@@ -311,7 +312,17 @@ export default function GameApp() {
       setReconnectOffer(null);
     }
   }, [remote, roomCode, myPlayerId, isHost, roomState?.game_state, pseudo, avatar]);
-
+  
+  const handleBackToSelection = async () => {
+    if (view === "playing" && roomCode) {
+      setBusy(true);
+      await returnToLobbyRemote(roomCode);
+      setBusy(false);
+    } else if (view === "lobby") {
+      setSelectedGame(null);
+    }
+  };
+  
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setJoinError(null);
@@ -464,14 +475,28 @@ export default function GameApp() {
             Parties en ligne
           </h1>
         </div>
+        // Remplace le bloc de la ligne 393 à 410 par celui-ci :
         {view !== "home" && (
-          <button
-            onClick={() => void goHome()}
-            disabled={busy}
-            className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white sm:px-4 sm:py-2 sm:text-sm"
-          >
-            Quitter
-          </button>
+          <div className="flex gap-2">
+            {/* Nouveau bouton Retour pour l'hôte */}
+            {isHost && (selectedGame || view === "playing") && (
+              <button
+                onClick={() => void handleBackToSelection()}
+                disabled={busy}
+                className="shrink-0 rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-600 shadow-sm transition hover:bg-violet-200 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                ← Retour
+              </button>
+            )}
+
+            <button
+              onClick={() => void goHome()}
+              disabled={busy}
+              className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white sm:px-4 sm:py-2 sm:text-sm"
+            >
+              Quitter
+            </button>
+          </div>
         )}
       </header>
 
