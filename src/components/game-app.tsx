@@ -420,7 +420,7 @@ export default function GameApp() {
 
 
 // --- NOUVEAUX STATES (Thèmes ON/OFF) ---
-  const ALL_THEMES: QuestionTheme[] = ["Géographie", "Sciences", "Histoire", "Culture G", "Sport", "Dessin animé", "Mini-Bac"];
+  const ALL_THEMES: QuestionTheme[] = ["Géographie", "Sciences", "Histoire", "Culture G", "Sport", "Dessin animé", "Mini-Bac",'Musique', "Mythologie", "Mathématiques"];
   const [activeThemes, setActiveThemes] = useState<QuestionTheme[]>(ALL_THEMES);
   // (La jauge "questionCount" est déjà déclarée plus haut dans ton fichier !)
 
