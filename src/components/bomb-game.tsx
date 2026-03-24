@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import type { Player } from "@/lib/lobby-types";
 import { submitBombGuessRemote, handleBombExplosionRemote, returnToLobbyRemote } from "@/lib/lobby-remote";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
+
 
 type BombGameProps = {
   roomCode: string;
@@ -32,7 +33,7 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(30);
-  
+  const inputRef = useRef<HTMLInputElement>(null); // <-- NOUVEAU
   // NOUVEAU : State pour stocker ce que les autres tapent
   const [liveTyping, setLiveTyping] = useState("");
   const channelRef = useRef<any>(null);
@@ -61,11 +62,11 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
     };
   }, [roomCode, currentTurnId, myPlayerId]);
 
-  // On vide la zone de frappe à chaque changement de tour
+  // On vide la zone de frappe à chaque changement de tour OU de consigne (explosion)
   useEffect(() => {
     setLiveTyping("");
     setDraft("");
-  }, [currentTurnId]);
+  }, [currentTurnId, constraint?.label]);
 
   // NOUVEAU : Fonction modifiée pour diffuser la frappe à chaque touche
   const handleDraftChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +109,10 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
   const submit = async () => {
     const word = draft.trim().toUpperCase();
     if (!myTurn || busy || !word) return;
+
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
 
     setBusy(true);
     setErr(null);
@@ -205,14 +210,18 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
         {myTurn ? (
           <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-2">
             <input
-              type="text"
-              value={draft}
-              onChange={handleDraftChange}
-              disabled={busy}
-              autoFocus
-              placeholder="Tape ton mot ici..."
-              className="w-full text-center text-2xl font-black tracking-widest p-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-100 outline-none transition disabled:opacity-50"
-            />
+            ref={inputRef} // <-- NOUVEAU
+            type="text"
+            value={draft}
+            disabled={!myTurn || busy}
+            // Attention : S'il y a le mot "autoFocus" écrit ici, supprime-le absolument !
+            onChange={(e) => {
+              setDraft(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""));
+              setErr(null);
+            }}
+            placeholder={myTurn ? "Tape ton mot ici..." : "Attends ton tour..."}
+            className="w-full text-center text-2xl font-black tracking-widest p-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-100 outline-none transition disabled:opacity-50"
+          />
             <AnimatePresence>
               {err && (
                 <motion.p 
