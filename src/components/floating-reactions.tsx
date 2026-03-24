@@ -179,13 +179,13 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
           )}
         </AnimatePresence>
 
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xl text-white shadow-lg transition hover:scale-105 active:scale-95 sm:h-14 sm:w-14 sm:text-2xl"
-          style={{ touchAction: "none" }} // Sécurité anti-scroll sur le bouton
+        <motion.button
+          onTap={() => setIsOpen(!isOpen)}
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xl text-white shadow-lg transition active:scale-95 sm:h-14 sm:w-14 sm:text-2xl"
+          style={{ touchAction: "none" }}
         >
           {isOpen ? "✕" : "💬"}
-        </button>
+        </motion.button>
       </motion.div>
     </>
   );

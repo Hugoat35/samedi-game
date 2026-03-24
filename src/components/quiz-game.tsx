@@ -302,6 +302,12 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     return withSpeedBonus(earned);
   }, [phase, answers, currentQuestion, roomState?.game_data?.answer_order, players.length]);
 
+  const pointsEarnedRef = useRef(pointsEarnedThisRound);
+  useEffect(() => { pointsEarnedRef.current = pointsEarnedThisRound; }, [pointsEarnedThisRound]);
+
+  const currentScoresRef = useRef(currentScores);
+  useEffect(() => { currentScoresRef.current = currentScores; }, [currentScores]);
+
   useEffect(() => {
     if (phase !== "reveal" || gameState !== "playing") return;
 
@@ -311,8 +317,11 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
           clearInterval(timer);
 
           if (isHost) {
-            const newTotalScores = { ...currentScores };
-            Object.entries(pointsEarnedThisRound).forEach(([pId, p]) => {
+            // On utilise currentScoresRef.current au lieu de currentScores
+            const newTotalScores = { ...currentScoresRef.current };
+            
+            // On utilise pointsEarnedRef.current au lieu de pointsEarnedThisRound
+            Object.entries(pointsEarnedRef.current).forEach(([pId, p]) => {
               newTotalScores[pId] = (newTotalScores[pId] || 0) + p;
             });
 
@@ -329,8 +338,9 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       });
     }, 1000);
 
+    // Regarde la ligne ci-dessous : j'ai retiré currentScores et pointsEarnedThisRound
     return () => clearInterval(timer);
-  }, [phase, gameState, isHost, currentIndex, questions, roomCode, currentScores, pointsEarnedThisRound]);
+  }, [phase, gameState, isHost, currentIndex, questions, roomCode]);
 
   const handleAnswerClick = async (answer: string | number) => {
     const answerStr = String(answer).trim();
