@@ -31,6 +31,7 @@ import type { QuestionTheme } from "@/lib/quiz-bank";
 // IMPORT DU NOUVEAU JEU !
 import QuizGame from "@/components/quiz-game";
 import WordleGame from "@/components/wordle-game";
+import FloatingReactions from "@/components/floating-reactions";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
@@ -918,6 +919,7 @@ export default function GameApp() {
                   {playerDepartedNotice}
                 </div>
               )}
+              <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
               {(roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wordle" ? (
                 <WordleGame
                   roomCode={roomCode}
