@@ -475,7 +475,7 @@ export default function GameApp() {
         )}
       </header>
 
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto scroll-touch">
+      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable] scroll-touch">
         <AnimatePresence mode="wait">
           
           {view === "home" && (

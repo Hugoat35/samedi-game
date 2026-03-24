@@ -140,7 +140,7 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
         dragConstraints={constraintsRef}
         dragMomentum={false}
         dragElastic={0.1}
-        className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3"
+        className="fixed bottom-6 right-6 z-50 flex flex-col items-end"
       >
         <AnimatePresence>
           {isOpen && (
@@ -148,7 +148,7 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 20 }}
-              className="flex w-64 flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-md"
+              className="absolute bottom-[calc(100%+12px)] right-0 origin-bottom-right flex w-64 flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-md"
             >
               {/* Emojis */}
               <div className="flex justify-between gap-1">
