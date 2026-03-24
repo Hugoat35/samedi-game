@@ -41,7 +41,7 @@ function selectedGameFromRoom(room: Record<string, unknown>): string {
 }
 
 const WORDLE_LEN_LO = 3;
-const WORDLE_LEN_HI = 7;
+const WORDLE_LEN_HI = 10;
 
 const pageTransition = {
   initial: { opacity: 0, y: 16, filter: "blur(4px)" },
@@ -70,9 +70,9 @@ export default function GameApp() {
   const [questionCount, setQuestionCount] = useState(5);
   const [wordleRounds, setWordleRounds] = useState(5);
   const WORDLE_LEN_LO = 3;
-  const WORDLE_LEN_HI = 7;
+  const WORDLE_LEN_HI = 10;
   const [wordleLenMin, setWordleLenMin] = useState(5);
-  const [wordleLenMax, setWordleLenMax] = useState(7);
+  const [wordleLenMax, setWordleLenMax] = useState(10);
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(() => remote);
   const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
