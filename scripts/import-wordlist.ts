@@ -30,7 +30,7 @@ function loadEnvLocal() {
 
 loadEnvLocal();
 
-const WORDLIST_DEFAULT = resolve(process.cwd(), "data/wordlist-fr.txt");
+const WORDLIST_DEFAULT = resolve(process.cwd(), "data/wordlist_finale.txt");
 
 /** Sans accents, A–Z uniquement, longueurs 3–7 (aligné jeu Wordle). */
 function normalizeWord(raw: string): string | null {
@@ -100,7 +100,7 @@ async function main() {
   }
 
   await flush();
-  console.log(`\nOK : ${lines} lignes lues, ${kept} mots uniques (3–7 lettres, sans accents).`);
+  console.log(`\nOK : ${lines} lignes lues, ${kept} mots uniques (3–10 lettres, sans accents).`);
   console.log("Sur Supabase SQL, exécute : ANALYZE public.wordle_dictionary;");
 }
 
