@@ -218,6 +218,7 @@ export default function GameApp() {
     };
   }, [remote]);
 
+  // DANS src/components/game-app.tsx
   useEffect(() => {
     if (!remote || view !== "playing") {
       if (view !== "playing") prevRemotePlayersRef.current = [];
@@ -229,9 +230,18 @@ export default function GameApp() {
       prevRemotePlayersRef.current = next;
       return;
     }
+    
     const nextIds = new Set(next.map((p: Player) => p.id));
     const departed = prev.filter((p: Player) => !nextIds.has(p.id));
-    if (departed.length > 0 && myPlayerId) {
+    
+    // --- NOUVEAUTÉ : On détecte si quelqu'un arrive (ou revient) ---
+    const prevIds = new Set(prev.map((p: Player) => p.id));
+    const arrived = next.filter((p: Player) => !prevIds.has(p.id));
+
+    if (arrived.length > 0) {
+      // Quelqu'un s'est reconnecté : on efface le bandeau rouge instantanément !
+      setPlayerDepartedNotice(null);
+    } else if (departed.length > 0 && myPlayerId) {
       const others = departed.filter((p: Player) => p.id !== myPlayerId);
       if (others.length > 0) {
         const msg =

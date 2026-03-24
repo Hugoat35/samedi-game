@@ -32,5 +32,23 @@ export function useRoomState(roomCode: string | null) {
     return () => { void supabase.removeChannel(channel); };
   }, [roomCode, refreshRoomState]);
 
+  // DANS src/hooks/use-room-state.ts (juste avant le return)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Dès que l'onglet redevient visible, on force la synchro !
+      if (document.visibilityState === "visible") {
+        void refreshRoomState();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
+  }, [refreshRoomState]);
+
   return { roomState, refreshRoomState };
 }

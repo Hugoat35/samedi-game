@@ -136,6 +136,23 @@ export function useLobbyPlayers(
     };
   }, [enabled, roomCode, isHost]);
 
+  // DANS src/hooks/use-lobby-players.ts (juste avant le return final)
+    useEffect(() => {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          void reloadRef.current(); // Recharge la liste des joueurs
+        }
+      };
+      
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("focus", handleVisibilityChange);
+  
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("focus", handleVisibilityChange);
+      };
+    }, []);
+
   return {
     players,
     loading,
