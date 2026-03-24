@@ -249,19 +249,36 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
     }
 
     if (currentQuestion.type === "estimation") {
-      const validAnswers = Object.entries(answers)
-        .map(([pId, ans]) => ({
-          pId,
-          val: Number(ans),
-          dist: Math.abs(Number(ans) - Number(currentQuestion.answer)),
-        }))
-        .filter((a) => !isNaN(a.val));
-      validAnswers.sort((a, b) => a.dist - b.dist);
-      const pointsDistribution = [100, 80, 60, 40, 20];
-      validAnswers.forEach((ans, idx) => {
-        earned[ans.pId] =
-          ans.dist === 0 ? currentQuestion.points + 50 : pointsDistribution[idx] || 0;
+      const target = Number(currentQuestion.answer);
+      
+      Object.entries(answers).forEach(([pId, ans]) => {
+        const val = Number(ans);
+        if (isNaN(val)) return;
+
+        const dist = Math.abs(val - target);
+        
+        // Cas spécial : Réponse exacte
+        if (dist === 0) {
+          earned[pId] = pts + 50;
+          return;
+        }
+
+        // Calcul du pourcentage d'erreur (si target est 0, on gère l'exception)
+        const errorMargin = target !== 0 ? (dist / Math.abs(target)) : dist;
+
+        if (errorMargin <= 0.05) { // Moins de 5% d'erreur
+          earned[pId] = pts;
+        } else if (errorMargin <= 0.15) { // Moins de 15% d'erreur
+          earned[pId] = Math.floor(pts * 0.7);
+        } else if (errorMargin <= 0.30) { // Moins de 30% d'erreur
+          earned[pId] = Math.floor(pts * 0.4);
+        } else if (errorMargin <= 0.50) { // Moins de 50% d'erreur
+          earned[pId] = Math.floor(pts * 0.1);
+        } else {
+          earned[pId] = 0;
+        }
       });
+
       return withSpeedBonus(earned);
     }
 
@@ -271,8 +288,20 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
         const y = parseYear(ans);
         if (y === null) return;
         const d = Math.abs(y - correct);
-        if (d === 0) earned[pId] = pts;
-        else if (d <= 3) earned[pId] = Math.floor(pts * 0.5);
+        
+        if (d === 0) {
+          earned[pId] = pts + 50; // Bonus pile-poil !
+        } else if (d <= 1) {
+          earned[pId] = pts; // 1 an d'écart, c'est quasiment parfait
+        } else if (d <= 4) {
+          earned[pId] = Math.floor(pts * 0.6); // 60% des points
+        } else if (d <= 10) {
+          earned[pId] = Math.floor(pts * 0.3); // 30% des points
+        } else if (d <= 20) {
+          earned[pId] = Math.floor(pts * 0.1); // Points de consolation (10%)
+        } else {
+          earned[pId] = 0;
+        }
       });
       return withSpeedBonus(earned);
     }
@@ -773,86 +802,89 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       <div className="flex w-full min-h-0 flex-1 flex-col gap-2 pb-1 sm:gap-3 sm:pb-0">
         {isTextBased ? (
           <div className="flex-1 flex flex-col gap-4 w-full">
-            {isMinibac ? (
+            {/* --- PHASE DE QUESTION : On affiche les champs de saisie --- */}
+            {phase === "question" ? (
               <>
-                <div className="flex items-center justify-center gap-3 rounded-2xl bg-violet-50/80 px-4 py-3 border border-violet-100">
-                  <span className="text-xs font-bold uppercase tracking-wider text-violet-600">Lettre</span>
-                  <span className="text-5xl font-black leading-none text-violet-600 tabular-nums">
-                    {currentQuestion.letter}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 w-full">
-                  {(currentQuestion.categories ?? []).map((cat, i) => (
-                    <div key={i} className="flex flex-col gap-1 text-left min-w-0">
-                      <label className="text-[11px] font-bold text-slate-500 leading-tight line-clamp-2">
-                        {cat}
-                      </label>
-                      <input
-                        type="text"
-                        value={minibacValues[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...minibacValues];
-                          next[i] = e.target.value;
-                          setMinibacValues(next);
-                        }}
-                        disabled={hasLockedAnswer || phase !== "question"}
-                        className="w-full text-base font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/95 focus:ring-2 focus:ring-violet-400 outline-none disabled:opacity-50"
-                        placeholder="…"
-                      />
+                {isMinibac ? (
+                  <>
+                    <div className="flex items-center justify-center gap-3 rounded-2xl bg-violet-50/80 px-4 py-3 border border-violet-100">
+                      <span className="text-xs font-bold uppercase tracking-wider text-violet-600">Lettre</span>
+                      <span className="text-5xl font-black leading-none text-violet-600 tabular-nums">
+                        {currentQuestion.letter}
+                      </span>
                     </div>
-                  ))}
-                </div>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleMinibacSubmit}
-                  disabled={
-                    hasLockedAnswer ||
-                    phase !== "question" ||
-                    minibacValues.some((v) => !String(v).trim())
-                  }
-                  className={`w-full py-3.5 rounded-2xl font-bold text-lg transition ${submitLockedClass} disabled:opacity-50`}
-                >
-                  {hasLockedAnswer ? "Réponse envoyée ✓" : "Valider ma grille"}
-                </motion.button>
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      {(currentQuestion.categories ?? []).map((cat, i) => (
+                        <div key={i} className="flex flex-col gap-1 text-left min-w-0">
+                          <label className="text-[11px] font-bold text-slate-500 leading-tight line-clamp-2">
+                            {cat}
+                          </label>
+                          <input
+                            type="text"
+                            value={minibacValues[i] ?? ""}
+                            onChange={(e) => {
+                              const next = [...minibacValues];
+                              next[i] = e.target.value;
+                              setMinibacValues(next);
+                            }}
+                            disabled={hasLockedAnswer}
+                            className="w-full text-base font-bold py-2.5 px-3 rounded-xl border border-slate-200 bg-white/95 focus:ring-2 focus:ring-violet-400 outline-none disabled:opacity-50"
+                            placeholder="…"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleMinibacSubmit}
+                      disabled={
+                        hasLockedAnswer ||
+                        minibacValues.some((v) => !String(v).trim())
+                      }
+                      className={`w-full py-3.5 rounded-2xl font-bold text-lg transition ${submitLockedClass} disabled:opacity-50`}
+                    >
+                      {hasLockedAnswer ? "Réponse envoyée ✓" : "Valider ma grille"}
+                    </motion.button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      inputMode={isEstimation || isDate ? "numeric" : "text"}
+                      pattern={isEstimation || isDate ? "[0-9]*" : undefined}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      disabled={hasLockedAnswer}
+                      placeholder={
+                        isDate
+                          ? "Année (ex. 1998)…"
+                          : isEstimation
+                            ? "Entre un nombre…"
+                            : isGeo
+                              ? "Nom du pays…"
+                              : "Ta réponse…"
+                      }
+                      className="w-full text-center text-3xl font-bold py-6 rounded-2xl border-none shadow-inner bg-white/90 focus:ring-4 focus:ring-violet-400 outline-none disabled:opacity-50"
+                    />
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleTextSubmit}
+                      disabled={hasLockedAnswer || inputValue.trim() === ""}
+                      className={`w-full py-5 rounded-2xl font-bold text-xl transition ${submitLockedClass} disabled:opacity-50`}
+                    >
+                      {hasLockedAnswer ? "Réponse envoyée ✓" : "Valider"}
+                    </motion.button>
+                  </>
+                )}
               </>
             ) : (
-              <>
-                <input
-                  type="text"
-                  inputMode={isEstimation || isDate ? "numeric" : "text"}
-                  pattern={isEstimation || isDate ? "[0-9]*" : undefined}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  disabled={hasLockedAnswer || phase !== "question"}
-                  placeholder={
-                    isDate
-                      ? "Année (ex. 1998)…"
-                      : isEstimation
-                        ? "Entre un nombre…"
-                        : isGeo
-                          ? "Nom du pays…"
-                          : "Ta réponse…"
-                  }
-                  className="w-full text-center text-3xl font-bold py-6 rounded-2xl border-none shadow-inner bg-white/90 focus:ring-4 focus:ring-violet-400 outline-none disabled:opacity-50"
-                />
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleTextSubmit}
-                  disabled={hasLockedAnswer || phase !== "question" || inputValue.trim() === ""}
-                  className={`w-full py-5 rounded-2xl font-bold text-xl transition ${submitLockedClass} disabled:opacity-50`}
-                >
-                  {hasLockedAnswer ? "Réponse envoyée ✓" : "Valider"}
-                </motion.button>
-              </>
-            )}
-
-            {phase === "reveal" && (
+              /* --- PHASE DE REVEAL : On remplace la saisie par la réponse --- */
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-6 rounded-2xl bg-white/90 shadow-md text-center"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="flex-1 flex flex-col justify-center items-center p-6 rounded-2xl bg-white/90 shadow-md text-center"
               >
                 {isMinibac ? (
                   <>
@@ -860,11 +892,10 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       Mini-Bac
                     </p>
                     <p className="text-slate-600 text-sm mb-3">
-                      Points au Tribunal : <span className="font-bold text-violet-700">+{MINIBAC_POINTS_PER_CELL} pts</span>{" "}
-                      par réponse acceptée.
+                      Points au Tribunal : <span className="font-bold text-violet-700">+{MINIBAC_POINTS_PER_CELL} pts</span>
                     </p>
                     {myMinibac && (
-                      <div className="text-left mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-left">
+                      <div className="text-left mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-left w-full">
                         {(myMinibac.categories || []).map((c, i) => (
                           <p key={i} className="text-xs col-span-1">
                             <span className="font-semibold text-slate-500 block truncate" title={c}>
@@ -881,40 +912,31 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">
                       {isDate ? "La bonne année" : isGeo ? "Le bon pays" : "La bonne réponse"}
                     </p>
-                    {geoImageUrl && (
-                      <div className="mb-3 flex justify-center">
-                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={geoImageUrl}
-                            alt=""
-                            className={`mx-auto max-h-24 object-contain sm:max-h-28 ${isGeoShape ? "p-1.5" : ""}`}
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <p className="text-4xl font-black text-green-500">{String(currentQuestion.answer)}</p>
+                    
+                    {/* Note: geoImageUrl supprimé ici car il est déjà affiché dans la carte du haut */}
+                    
+                    <p className="text-5xl font-black text-green-500 mb-6 drop-shadow-sm">
+                      {String(currentQuestion.answer)}
+                    </p>
 
                     {showPeerTextAnswers && players.some((p) => p.id !== myPlayerId) && (
-                      <div className="mt-4 w-full max-w-full rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2.5 text-left shadow-inner">
+                      <div className="w-full max-w-full rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2.5 text-left shadow-inner mb-4">
                         <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
                           Les autres
                         </p>
-                        <ul className="max-h-[min(30vh,200px)] space-y-1.5 overflow-y-auto pr-0.5">
+                        <ul className="max-h-[120px] space-y-1.5 overflow-y-auto pr-0.5">
                           {players
                             .filter((p) => p.id !== myPlayerId)
                             .map((p) => {
                               const txt = answers[p.id];
                               return (
-                                <li key={p.id} className="flex items-start gap-2">
-                                  <PlayerFace player={p} className="mt-0.5 h-6 w-6 sm:h-7 sm:w-7" />
+                                <li key={p.id} className="flex items-center gap-2">
+                                  <PlayerFace player={p} className="h-5 w-5" />
                                   <div className="min-w-0 flex-1">
-                                    <span className="block truncate text-[10px] font-semibold text-slate-400">
+                                    <span className="block truncate text-[9px] font-semibold text-slate-400">
                                       {p.name}
                                     </span>
-                                    <span className="line-clamp-3 break-words text-sm font-bold leading-snug text-slate-800">
+                                    <span className="line-clamp-1 text-xs font-bold leading-snug text-slate-800">
                                       {txt != null && String(txt).trim() !== "" ? txt : "—"}
                                     </span>
                                   </div>
@@ -925,7 +947,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       </div>
                     )}
 
-                    <div className="h-px w-full bg-slate-200 my-4"></div>
+                    <div className="h-px w-full bg-slate-200 my-4 opacity-50"></div>
                     <p className="text-sm font-bold text-slate-500">
                       Ton choix :{" "}
                       <span className={myPoints > 0 ? "text-green-500" : "text-red-500"}>
@@ -933,7 +955,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
                       </span>
                     </p>
                     {myPoints > 0 && (
-                      <p className="text-violet-600 font-bold text-xl mt-2">+{myPoints} points !</p>
+                      <p className="text-violet-600 font-bold text-2xl mt-1">+{myPoints} pts !</p>
                     )}
                   </>
                 )}
