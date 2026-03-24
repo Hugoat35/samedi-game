@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 import type { Player } from "@/lib/lobby-types";
+import type { RealtimeChannel } from "@supabase/supabase-js"; // Pour corriger l'erreur de type
 
 const EMOJIS = ["😂", "🤯", "🤬", "🤨", "😭", "💩"];
 const MESSAGES = ["Bien joué !", "Aïe...", "Vite !", "Je sèche..."];
@@ -30,20 +31,30 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
   const [isOpen, setIsOpen] = useState(false);
   const [emojis, setEmojis] = useState<ActiveEmoji[]>([]);
   const [messages, setMessages] = useState<ActiveMessage[]>([]);
+  const [channel, setChannel] = useState<RealtimeChannel | null>(null); // État pour le canal stable
   const constraintsRef = useRef<HTMLDivElement>(null);
+
+  // RÉFÉRENCE STABLE : Évite de couper la connexion quand les scores changent
+  const playersRef = useRef(players);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   // Écoute des messages en temps réel (Broadcast)
   useEffect(() => {
     const supabase = getSupabaseBrowser();
-    if (!supabase) return;
+    if (!supabase || !roomCode) return;
 
-    // On crée un canal unique pour les réactions de cette salle
-    const channel = supabase.channel(`reactions:${roomCode}`);
+    // On crée un canal unique et stable
+    const newChannel = supabase.channel(`reactions:${roomCode}`, {
+      config: { broadcast: { self: false } }, // On ne reçoit pas ses propres messages (gérés en local)
+    });
 
-    channel
+    newChannel
       .on("broadcast", { event: "reaction" }, (payload) => {
-        const { type, content, senderId } = payload.payload;
-        const sender = players.find((p) => p.id === senderId);
+        // Correction de l'accès au payload
+        const { type, content, senderId } = payload.payload || payload; 
+        const sender = playersRef.current.find((p) => p.id === senderId);
         const senderName = sender ? sender.name : "Quelqu'un";
 
         if (type === "emoji") {
@@ -52,54 +63,57 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
             { id: Math.random().toString(), char: content, xOffset: Math.random() * 60 - 30 },
           ]);
         } else if (type === "message") {
-          const newMsg = { id: Math.random().toString(), text: content, senderName };
+          const id = Math.random().toString();
+          const newMsg = { id, text: content, senderName };
           setMessages((prev) => [...prev, newMsg]);
-          // Supprime le message après 3 secondes
           setTimeout(() => {
-            setMessages((prev) => prev.filter((m) => m.id !== newMsg.id));
+            setMessages((prev) => prev.filter((m) => m.id !== id));
           }, 3000);
         }
       })
       .subscribe();
 
+    setChannel(newChannel);
+
     return () => {
-      supabase.removeChannel(channel);
+      newChannel.unsubscribe();
     };
-  }, [roomCode, players]);
+  }, [roomCode]); // On ne dépend plus de "players" ici
 
   // Fonction pour envoyer une réaction
   const sendReaction = async (type: "emoji" | "message", content: string) => {
-    setIsOpen(false); // On ferme le menu après envoi
-    const supabase = getSupabaseBrowser();
-    if (!supabase) return;
-
-    // On s'ajoute l'emoji à nous-mêmes instantanément (pour ne pas attendre le retour serveur)
+    setIsOpen(false);
+    
+    // 1. Optimistic UI : On l'affiche pour nous immédiatement
     if (type === "emoji") {
       setEmojis((prev) => [
         ...prev,
         { id: Math.random().toString(), char: content, xOffset: Math.random() * 60 - 30 },
       ]);
     } else if (type === "message") {
-      const myName = players.find((p) => p.id === myPlayerId)?.name || "Moi";
-      const newMsg = { id: Math.random().toString(), text: content, senderName: myName };
+      const myName = playersRef.current.find((p) => p.id === myPlayerId)?.name || "Moi";
+      const id = Math.random().toString();
+      const newMsg = { id, text: content, senderName: myName };
       setMessages((prev) => [...prev, newMsg]);
-      setTimeout(() => setMessages((prev) => prev.filter((m) => m.id !== newMsg.id)), 3000);
+      setTimeout(() => setMessages((prev) => prev.filter((m) => m.id !== id)), 3000);
     }
 
-    // On l'envoie aux autres
-    await supabase.channel(`reactions:${roomCode}`).send({
-      type: "broadcast",
-      event: "reaction",
-      payload: { type, content, senderId: myPlayerId },
-    });
+    // 2. Envoi via le canal stable (beaucoup plus rapide)
+    if (channel) {
+      channel.send({
+        type: "broadcast",
+        event: "reaction",
+        payload: { type, content, senderId: myPlayerId },
+      });
+    }
   };
 
   return (
     <>
-      {/* CAGE INVISIBLE : Empêche le bouton de sortir de l'écran */}
+      {/* CAGE INVISIBLE */}
       <div ref={constraintsRef} className="pointer-events-none fixed inset-4 z-40 sm:inset-8" />
 
-      {/* ZONE DES EMOJIS VOLANTS (Fantôme, ne bloque pas les clics) */}
+      {/* ZONE DES EMOJIS VOLANTS */}
       <div className="pointer-events-none fixed inset-0 z-[100] flex items-end justify-center overflow-hidden pb-32">
         <AnimatePresence>
           {emojis.map((emoji) => (
@@ -117,7 +131,7 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
         </AnimatePresence>
       </div>
 
-      {/* ZONE DES MESSAGES RAPIDES (En haut de l'écran) */}
+      {/* ZONE DES MESSAGES RAPIDES */}
       <div className="pointer-events-none fixed left-0 right-0 top-16 z-[100] flex flex-col items-center gap-2">
         <AnimatePresence>
           {messages.map((msg) => (
@@ -148,6 +162,7 @@ export default function FloatingReactions({ roomCode, myPlayerId, players }: Flo
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              // absolute et origin-bottom-right corrigent le "saut" visuel
               className="absolute bottom-[calc(100%+12px)] right-0 origin-bottom-right flex w-64 flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-md"
             >
               {/* Emojis */}
