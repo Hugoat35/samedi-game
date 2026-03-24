@@ -1,6 +1,8 @@
 import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 import { getRandomQuestionsByTheme } from "./quiz-bank";
+import { generateBombConstraint, type BombConstraint } from "./questions/bomb";
+
 
 export type { Player };
 
@@ -696,4 +698,182 @@ export async function returnToLobbyRemote(roomCode: string) {
     .eq("code", roomCode);
 
   return { ok: !error };
+}
+
+// ... (Garde tout le code existant) ...
+
+// ============================================================================
+// MODE "BOMB" (Patate Chaude)
+// ============================================================================
+
+export async function startBombGameRemote(
+  roomCode: string,
+  players: Player[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  // Initialisation : on mélange les joueurs pour l'ordre de passage
+  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+  const playerOrder = shuffledPlayers.map((p) => p.id);
+  
+  // Tout le monde commence avec 2 vies
+  const lives: Record<string, number> = {};
+  playerOrder.forEach((id) => (lives[id] = 2));
+
+  // Première consigne
+  const initialConstraint = generateBombConstraint();
+  
+  // Timer aléatoire entre 15 et 30 secondes pour la première bombe
+  const timerSeconds = Math.floor(Math.random() * 16) + 15; 
+  // On stocke le timestamp de fin (en ms)
+  const explosionTime = Date.now() + (timerSeconds * 1000);
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_mode: "bomb", // On change le mode de jeu ici !
+      game_state: "playing",
+      game_data: {
+        player_order: playerOrder,
+        turn_index: 0,
+        lives: lives,
+        current_constraint: initialConstraint,
+        explosion_time: explosionTime,
+        used_words: [] as string[], // Pour empêcher de répéter les mots
+        status: "playing",
+        round_number: 1,
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Fonction pour soumettre un mot dans le mode Bombe
+export async function submitBombGuessRemote(
+  roomCode: string,
+  playerId: string,
+  word: string,
+  currentData: any // On passe game_data pour éviter un fetch supplémentaire
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  // 1. On vérifie que le mot existe dans le dictionnaire
+  const dictCheck = await wordleWordExistsRemote(word);
+  if (!dictCheck.inDictionary) {
+    return { ok: false, error: "Mot inconnu." };
+  }
+
+  // 2. On vérifie qu'il n'a pas déjà été dit
+  const usedWords = currentData.used_words || [];
+  if (usedWords.includes(word.toUpperCase())) {
+    return { ok: false, error: "Mot déjà utilisé !" };
+  }
+
+  // 3. C'est bon ! On passe au joueur suivant et on régénère une consigne
+  const order = currentData.player_order as string[];
+  const currentIndex = currentData.turn_index as number;
+  
+  // Trouver le prochain joueur en vie
+  let nextIndex = (currentIndex + 1) % order.length;
+  let attempts = 0;
+  while ((currentData.lives[order[nextIndex]] || 0) <= 0 && attempts < order.length) {
+    nextIndex = (nextIndex + 1) % order.length;
+    attempts++;
+  }
+
+  const newConstraint = generateBombConstraint();
+  // On remet un peu de temps sur la bombe (ex: 10 à 20 secondes)
+  const timerSeconds = Math.floor(Math.random() * 11) + 10;
+  // On ajoute le temps *restant* au nouveau temps, max 30s
+  const timeLeft = Math.max(0, currentData.explosion_time - Date.now());
+  const newExplosionTime = Date.now() + Math.min(30000, timeLeft + (timerSeconds * 1000));
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: {
+        ...currentData,
+        turn_index: nextIndex,
+        current_constraint: newConstraint,
+        explosion_time: newExplosionTime,
+        used_words: [...usedWords, word.toUpperCase()],
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Fonction appelée quand la bombe explose
+export async function handleBombExplosionRemote(
+  roomCode: string,
+  currentData: any
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const order = currentData.player_order as string[];
+  const currentIndex = currentData.turn_index as number;
+  const loserId = order[currentIndex];
+  
+  const newLives = { ...currentData.lives };
+  newLives[loserId] = Math.max(0, (newLives[loserId] || 0) - 1);
+
+  // Vérifier combien de joueurs sont encore en vie
+  const playersAlive = Object.values(newLives).filter(l => (l as number) > 0).length;
+
+  if (playersAlive <= 1) {
+    // Fin de la partie !
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        game_state: "finished",
+        game_data: {
+          ...currentData,
+          lives: newLives,
+          status: "game_over"
+        }
+      })
+      .eq("code", roomCode.trim());
+    return { ok: !error, error: error?.message || "" };
+  }
+
+  // La partie continue : nouvelle manche
+  // Le perdant recommence (s'il n'est pas mort) ou on passe au suivant
+  let nextIndex = currentIndex;
+  if (newLives[loserId] <= 0) {
+    nextIndex = (currentIndex + 1) % order.length;
+    let attempts = 0;
+    while ((newLives[order[nextIndex]] || 0) <= 0 && attempts < order.length) {
+      nextIndex = (nextIndex + 1) % order.length;
+      attempts++;
+    }
+  }
+
+  const newConstraint = generateBombConstraint();
+  const timerSeconds = Math.floor(Math.random() * 16) + 15; // Reset entre 15 et 30s
+  const newExplosionTime = Date.now() + (timerSeconds * 1000);
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: {
+        ...currentData,
+        lives: newLives,
+        turn_index: nextIndex,
+        current_constraint: newConstraint,
+        explosion_time: newExplosionTime,
+        used_words: [], // On vide les mots utilisés pour le nouveau round
+        round_number: (currentData.round_number || 1) + 1
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }

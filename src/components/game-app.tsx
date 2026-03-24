@@ -15,6 +15,8 @@ import {
   returnToLobbyRemote,
   startGameRemote,
   startWordleGameRemote,
+  startBombGameRemote,
+
 } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
 import {
@@ -33,10 +35,13 @@ import type { QuestionTheme } from "@/lib/quiz-bank";
 import QuizGame from "@/components/quiz-game";
 import WordleGame from "@/components/wordle-game";
 import FloatingReactions from "@/components/floating-reactions";
+import BombGame from "./bomb-game";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
 function selectedGameFromRoom(room: Record<string, unknown>): string {
+  const mode = room.game_mode as string | undefined;
+  if (mode === "bomb") return "bomb-game";
   const gk = (room.game_data as { game_kind?: string } | undefined)?.game_kind;
   return gk === "wordle" ? "wordle-team" : "culture-quiz";
 }
@@ -402,11 +407,15 @@ export default function GameApp() {
     if (!roomCode) return;
     if (remote) {
       setBusy(true);
-      const result =
-        selectedGame === "wordle-team"
-          ? await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax)
-          // ICI : On envoie la jauge ET la liste des thèmes activés
-          : await startGameRemote(roomCode, questionCount, activeThemes);
+      
+      let result;
+      if (selectedGame === "wordle-team") {
+        result = await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax);
+      } else if (selectedGame === "bomb-game") {
+        result = await startBombGameRemote(roomCode, players);
+      } else {
+        result = await startGameRemote(roomCode, questionCount, activeThemes);
+      }
       setBusy(false);
 
       if (!result.ok) {
@@ -763,12 +772,23 @@ export default function GameApp() {
                             <span className="shrink-0 text-xs font-bold text-emerald-600 sm:text-sm">→</span>
                           </div>
                         </button>
+                        <button
+                          onClick={() => setSelectedGame("bomb-game")}
+                          className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-orange-500 p-[1.5px] shadow-sm transition hover:brightness-[1.02] sm:rounded-2xl sm:p-[2px]"
+                        >
+                          <div className="flex w-full items-center justify-between gap-2 rounded-[11px] bg-white px-3 py-3 sm:rounded-[14px] sm:px-5 sm:py-3.5">
+                            <span className="min-w-0 truncate text-left text-sm font-bold text-slate-800 sm:text-base">
+                              💣 La Bombe
+                            </span>
+                            <span className="shrink-0 text-xs font-bold text-rose-600 sm:text-sm">→</span>
+                          </div>
+                        </button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3 sm:gap-4">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base">
-                            {selectedGame === "wordle-team" ? "🔤 Wordle à plusieurs" : "🧠 Culture Quiz"}
+                            {selectedGame === "wordle-team" ? "🔤 Wordle à plusieurs" : selectedGame === "bomb-game" ? "💣 La Bombe" : "🧠 Culture Quiz"}
                           </h3>
                           <button
                             type="button"
@@ -862,6 +882,12 @@ export default function GameApp() {
                               className="mb-1 w-full accent-emerald-600"
                             />
                           </>
+                          ) : selectedGame === "bomb-game" ? (
+                          <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-center">
+                            <p className="text-sm font-bold text-rose-800">Préparez-vous !</p>
+                            <p className="text-xs text-rose-600 mt-1">Trouvez les mots le plus vite possible avant que la bombe n'explose.</p>
+                          </div>
+                          
                         ) : (
                               <div className="flex flex-col gap-2">
                           {/* JAUGE DE QUESTIONS */}
@@ -957,7 +983,15 @@ export default function GameApp() {
                 </div>
               )}
               <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
-              {(roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wordle" ? (
+              {roomState?.game_mode === "bomb" ? (
+                <BombGame
+                  roomCode={roomCode}
+                  roomState={roomState}
+                  myPlayerId={myPlayerId}
+                  isHost={isHost}
+                  players={players}
+                />
+              ) : (roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wordle" ? (
                 <WordleGame
                   roomCode={roomCode}
                   roomState={roomState}
