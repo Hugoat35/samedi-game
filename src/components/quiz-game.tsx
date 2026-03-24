@@ -27,13 +27,18 @@ type QuizGameProps = {
   players: Player[];
 };
 
-const GET_DURATION = (type: string) => {
-  if (type === "true_false") return 8;
-  if (type === "qcm") return 12;
-  if (type === "date") return 12;
-  if (type === "minibac") return 90;
-  if (type === "geo_flag") return 18;
-  if (type === "geo_shape") return 22;
+// On passe la question entière à la fonction
+const GET_DURATION = (q: QuizQuestion) => {
+  // S'il y a un temps imposé pour cette question, on l'utilise en priorité !
+  if (q.timeLimit) return q.timeLimit; 
+  
+  // Sinon, on garde tes règles habituelles
+  if (q.type === "true_false") return 8;
+  if (q.type === "qcm") return 12;
+  if (q.type === "date") return 12;
+  if (q.type === "minibac") return 90;
+  if (q.type === "geo_flag") return 18;
+  if (q.type === "geo_shape") return 22;
   return 15;
 };
 
@@ -144,7 +149,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
   useEffect(() => {
     if (!currentQuestion?.id) return;
     setPhase("question");
-    setTimeLeft(GET_DURATION(currentQuestion.type));
+    setTimeLeft(GET_DURATION(currentQuestion));
     setRevealTimeLeft(REVEAL_DURATION);
     setInputValue("");
     setMinibacValues(["", "", "", ""]);
@@ -706,7 +711,7 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
 
   if (!currentQuestion) return <div className="text-center p-8 text-slate-500 font-bold">Chargement...</div>;
 
-  const duration = GET_DURATION(currentQuestion.type);
+  const duration = GET_DURATION(currentQuestion);
   const isTextBased =
     currentQuestion.type === "estimation" ||
     currentQuestion.type === "open" ||

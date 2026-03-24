@@ -6,6 +6,7 @@ import { qcmQuestions } from "./questions/qcm";
 import { estimationQuestions } from "./questions/estimation";
 import { openQuestions } from "./questions/open";
 import { dateQuestions } from "./questions/date";
+import { generateMathQuestion } from "./questions/math";
 
 export type QuestionType =
   | "qcm"
@@ -15,9 +16,10 @@ export type QuestionType =
   | "minibac"
   | "true_false"
   | "geo_flag"
-  | "geo_shape";
+  | "geo_shape"
+  | "math";
 
-export type QuestionTheme = "Géographie" | "Sciences" | "Histoire" | "Culture G" | "Mini-Bac" | "Sport" | "Dessin animé";
+export type QuestionTheme = "Géographie" | "Sciences" | "Histoire" | "Culture G" | "Mini-Bac" | "Sport" | "Dessin animé" | "Mythologie" | "Musique" | "Mathématiques";
 
 export interface QuizQuestion {
   id: string;
@@ -31,6 +33,7 @@ export interface QuizQuestion {
   answerAliases?: string[];
   letter?: string;
   categories?: string[];
+  timeLimit?: number;
 }
 
 export function buildGeoFlagUrl(countryCode: string): string {
@@ -116,10 +119,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
 
 
 export function getRandomQuestionsByTheme(count: number, activeThemes: QuestionTheme[]): QuizQuestion[] {
-  const pool = QUIZ_BANK.filter((q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac");
+  // 1. On exclut "Mini-Bac" ET "Mathématiques" du pool statique puisqu'ils sont générés à la volée
+  const pool = QUIZ_BANK.filter(
+    (q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac" && q.theme !== "Mathématiques"
+  );
   const shuffled = shuffle([...pool]);
   let selected = shuffled.slice(0, count);
 
+  // --- 2. Injection du Mini-Bac ---
   if (activeThemes.includes("Mini-Bac") && count >= 5 && selected.length >= 4) {
     const numMiniBacs = count >= 15 ? 2 : 1;
 
@@ -145,5 +152,21 @@ export function getRandomQuestionsByTheme(count: number, activeThemes: QuestionT
     }
   }
 
+  // --- 3. Injection des Mathématiques ---
+  if (activeThemes.includes("Mathématiques") && selected.length > 0) {
+    // 1 question de maths pour les parties courtes, 2 pour les parties de 15 questions ou plus
+    const numMaths = count >= 15 ? 2 : 1;
+
+    for (let i = 0; i < numMaths; i++) {
+      // On génère la question depuis ton nouveau fichier
+      const mathQuestion = generateMathQuestion();
+      
+      // On remplace une question au hasard dans la liste sélectionnée
+      const replaceIndex = randomIntBelow(selected.length);
+      selected[replaceIndex] = mathQuestion;
+    }
+  }
+
+  // On mélange une dernière fois pour que les Mini-Bacs et les Maths ne soient pas toujours au même endroit
   return shuffle(selected);
 }
