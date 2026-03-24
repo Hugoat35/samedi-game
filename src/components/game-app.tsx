@@ -40,9 +40,8 @@ import BombGame from "./bomb-game";
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
 function selectedGameFromRoom(room: Record<string, unknown>): string {
-  const mode = room.game_mode as string | undefined;
-  if (mode === "bomb") return "bomb-game";
   const gk = (room.game_data as { game_kind?: string } | undefined)?.game_kind;
+  if (gk === "bomb") return "bomb-game";
   return gk === "wordle" ? "wordle-team" : "culture-quiz";
 }
 
@@ -983,7 +982,7 @@ export default function GameApp() {
                 </div>
               )}
               <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
-              {roomState?.game_mode === "bomb" ? (
+              {(roomState?.game_data as any)?.game_kind === "bomb" ? (
                 <BombGame
                   roomCode={roomCode}
                   roomState={roomState}

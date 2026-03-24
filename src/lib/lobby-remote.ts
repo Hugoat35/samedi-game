@@ -732,9 +732,9 @@ export async function startBombGameRemote(
   const { error } = await supabase
     .from("rooms")
     .update({
-      game_mode: "bomb", // On change le mode de jeu ici !
       game_state: "playing",
       game_data: {
+        game_kind: "bomb",
         player_order: playerOrder,
         turn_index: 0,
         lives: lives,
