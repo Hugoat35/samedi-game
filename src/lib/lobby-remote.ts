@@ -1,7 +1,8 @@
 import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
-import { getRandomQuestionsByTheme } from "./quiz-bank";
 import { generateBombConstraint, type BombConstraint } from "./questions/bomb";
+import { getRandomQuestionsByTheme, type QuestionDifficulty } from "./quiz-bank";
+
 
 
 export type { Player };
@@ -389,12 +390,20 @@ export async function submitAnswerRemote(
   return { ok: false, error: lastError };
 }
 
-export async function startGameRemote(roomCode: string, questionCount: number, activeThemes: string[]) {
+export async function startGameRemote(
+  roomCode: string, 
+  questionCount: number, 
+  activeThemes: string[],
+  difficulties: QuestionDifficulty[] = ["facile", "moyen", "difficile"]
+) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  const selectedQuestions = getRandomQuestionsByTheme(questionCount, activeThemes as any);
-
+  const selectedQuestions = getRandomQuestionsByTheme(questionCount, activeThemes as any, difficulties);
+  
+  if (selectedQuestions.length === 0) {
+    return { ok: false, error: "Aucune question trouvée pour cette combinaison. Cochez plus de thèmes/difficultés !" };
+  }
   const { error } = await supabase
     .from("rooms")
     .update({

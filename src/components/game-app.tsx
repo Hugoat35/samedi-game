@@ -413,7 +413,7 @@ export default function GameApp() {
       } else if (selectedGame === "bomb-game") {
         result = await startBombGameRemote(roomCode, players);
       } else {
-        result = await startGameRemote(roomCode, questionCount, activeThemes);
+        result = await startGameRemote(roomCode, questionCount, activeThemes, activeDifficulties);
       }
       setBusy(false);
 
@@ -431,6 +431,16 @@ export default function GameApp() {
   const ALL_THEMES: QuestionTheme[] = ["Géographie", "Sciences", "Histoire", "Culture G", "Sport", "Dessin animé", "Mini-Bac",'Musique', "Mythologie", "Mathématiques"];
   const [activeThemes, setActiveThemes] = useState<QuestionTheme[]>(ALL_THEMES);
   // (La jauge "questionCount" est déjà déclarée plus haut dans ton fichier !)
+
+  type Difficulty = "facile" | "moyen" | "difficile";
+  const ALL_DIFFICULTIES: Difficulty[] = ["facile", "moyen", "difficile"];
+  const [activeDifficulties, setActiveDifficulties] = useState<Difficulty[]>(ALL_DIFFICULTIES);
+
+  const toggleDifficulty = (diff: Difficulty) => {
+    setActiveDifficulties(prev => 
+      prev.includes(diff) ? prev.filter(d => d !== diff) : [...prev, diff]
+    );
+  };
 
   const toggleTheme = (theme: QuestionTheme) => {
     setActiveThemes(prev => 
@@ -942,6 +952,39 @@ export default function GameApp() {
                               <p className="text-xs text-red-500 font-bold mt-1 text-center">⚠️ Active au moins un thème !</p>
                             )}
                           </div>
+
+                          {/* --- NOUVEAU SÉLECTEUR DE DIFFICULTÉ --- */}
+                          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                            <span className="text-xs font-bold text-slate-700 sm:text-sm">Difficulté des questions</span>
+                            <div className="flex gap-2">
+                              {ALL_DIFFICULTIES.map((diff) => {
+                                const isActive = activeDifficulties.includes(diff);
+                                let activeClass = "";
+                                if (diff === "facile") activeClass = "bg-green-500 border-green-600 text-white";
+                                if (diff === "moyen") activeClass = "bg-amber-500 border-amber-600 text-white";
+                                if (diff === "difficile") activeClass = "bg-red-500 border-red-600 text-white";
+                                
+                                return (
+                                  <button
+                                    key={diff}
+                                    type="button"
+                                    onClick={() => toggleDifficulty(diff)}
+                                    style={{ WebkitTapHighlightColor: "transparent" }}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm outline-none select-none sm:text-sm ${
+                                      isActive ? activeClass : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {isActive ? "✓ " : ""}{diff.charAt(0).toUpperCase() + diff.slice(1)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {activeDifficulties.length === 0 && (
+                              <p className="text-xs text-red-500 font-bold mt-1 text-center">⚠️ Coche au moins une difficulté !</p>
+                            )}
+                          </div>
+                          {/* ----------------------------------------- */}
+
                         </div>
                         )}
 

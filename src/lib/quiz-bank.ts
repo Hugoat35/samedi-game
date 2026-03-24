@@ -118,9 +118,29 @@ export const QUIZ_BANK: QuizQuestion[] = [
 ];
 
 
-export function getRandomQuestionsByTheme(count: number, activeThemes: QuestionTheme[]): QuizQuestion[] {
+export type QuestionDifficulty = "facile" | "moyen" | "difficile";
+
+function getQuestionDifficulty(points: number): QuestionDifficulty {
+  if (points < 100) return "facile";
+  if (points < 150) return "moyen";
+  return "difficile";
+}
+
+export function getRandomQuestionsByTheme(
+  count: number, 
+  activeThemes: QuestionTheme[],
+  difficulties: QuestionDifficulty[] = ["facile", "moyen", "difficile"]
+): QuizQuestion[] {
   // 1. On récupère les questions des thèmes classiques
-  const pool = QUIZ_BANK.filter((q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac" && q.theme !== "Mathématiques");
+  let pool = QUIZ_BANK.filter((q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac" && q.theme !== "Mathématiques");
+  
+  // 1b. On filtre par difficulté
+  pool = pool.filter(q => {
+    if (q.points === undefined) return true;
+    const diff = getQuestionDifficulty(q.points);
+    return difficulties.includes(diff);
+  });
+
   const shuffled = shuffle([...pool]);
   let selected = shuffled.slice(0, count);
 

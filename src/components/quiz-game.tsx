@@ -317,15 +317,18 @@ export default function QuizGame({ roomCode, roomState, myPlayerId, isHost, play
       currentQuestion.type === "geo_shape"
     ) {
       Object.entries(answers).forEach(([pId, ans]) => {
+        const answerStr = String(ans).trim();
+        // CORRECTION : On ignore les réponses vides
+        if (answerStr === "") return;
+        
         if (
-          matchOpenTolerance(String(ans), String(currentQuestion.answer), currentQuestion.answerAliases)
+          matchOpenTolerance(answerStr, String(currentQuestion.answer), currentQuestion.answerAliases)
         ) {
           earned[pId] = pts;
         }
       });
       return withSpeedBonus(earned);
     }
-
     Object.entries(answers).forEach(([pId, ans]) => {
       if (
         String(ans).trim().toLowerCase() === String(currentQuestion.answer).trim().toLowerCase()

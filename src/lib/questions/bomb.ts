@@ -6,9 +6,36 @@ export type BombConstraint = {
   label: string;
 };
 
-const PREFIXES = ["CO", "RE", "MA", "DE", "EN", "PA", "IN", "PR", "PO", "TE", "CA", "SA"];
-const SUFFIXES = ["ER", "ES", "NT", "ON", "TE", "UR", "IR", "IE", "AL", "ET", "EZ", "IS"];
-const INFIXES = ["AR", "OU", "EN", "AN", "ON", "OR", "IN", "AL", "UR", "OM", "IM", "OI"];
+const PREFIXES = [
+  // 2 lettres (très courants)
+  "BA", "CA", "CH", "CO", "DE", "DI", "EN", "FI", "GA", "IN", 
+  "LA", "MA", "MI", "MO", "PA", "PI", "PO", "PR", "QU", "RE", 
+  "RO", "SA", "SE", "TA", "TE", "TR", "VA", "VI",
+  // 3 lettres (classiques)
+  "ACC", "APP", "COM", "CON", "DES", "ENT", "PAR", "PRE", 
+  "PRO", "SOU", "SUR", "TRA"
+];
+
+const SUFFIXES = [
+  // 2 lettres
+  "AL", "AS", "AT", "EE", "EL", "ER", "ES", "ET", "EU", "EZ", 
+  "IE", "IR", "IS", "IT", "NT", "ON", "OS", "OT", "RE", "TE", 
+  "TS", "UR", "US", "UX",
+  // 3 lettres (terminaisons fréquentes)
+  "AIT", "ANT", "ARD", "AUX", "BLE", "EAU", "ENT", "EUR", 
+  "IER", "ION", "OIR", "OIS", "ONS", "OUR", "TTE", "URE"
+];
+
+const INFIXES = [
+  // 2 lettres (les sons les plus fréquents)
+  "AL", "AN", "AR", "AS", "AT", "CH", "EI", "EM", "EN", "ER", 
+  "ES", "ET", "EU", "IL", "IM", "IN", "IR", "IS", "IT", "OI", 
+  "OM", "ON", "OR", "OS", "OU", "QU", "RE", "SS", "TE", "TI", 
+  "TR", "UI", "UN", "UR",
+  // 3 lettres (sons complexes mais très courants au milieu d'un mot)
+  "AIN", "AIR", "ANT", "EAU", "EIN", "ENT", "EUR", "ILL", 
+  "ION", "OUR", "QUE", "TRE"
+];
 
 function randomChoice<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
