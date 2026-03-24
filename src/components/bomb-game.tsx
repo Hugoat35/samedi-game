@@ -117,8 +117,9 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
         <motion.div animate={shakeAnimation} className="text-8xl md:text-9xl drop-shadow-2xl mb-2">
           💣
         </motion.div>
-        <p className={`text-4xl font-black font-mono tabular-nums ${isPanic ? 'text-rose-600 animate-pulse' : 'text-slate-800'}`}>
-          {timeLeft.toFixed(1)}s
+        {/* Le chrono est caché ! On affiche juste un texte stressant */}
+        <p className={`text-2xl font-black uppercase tracking-widest ${isPanic ? 'text-rose-600 animate-pulse' : 'text-slate-500'}`}>
+          Tic Tac...
         </p>
       </div>
 

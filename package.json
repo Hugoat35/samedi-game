@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "import-wordlist": "npx tsx scripts/import-wordlist.ts"
+    "import-wordlist": "npx tsx scripts/import-wordlist.ts",
+    "import-french": "npx tsx scripts/import-french-dict.ts"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

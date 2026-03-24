@@ -750,7 +750,21 @@ export async function startBombGameRemote(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+// Fonction spécifique pour vérifier le dico complet de la Bombe
+export async function bombWordExistsRemote(word: string): Promise<{ inDictionary: boolean; rpcError: string | null }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { inDictionary: false, rpcError: "Supabase non configuré." };
 
+  // On cherche le mot directement dans la nouvelle table
+  const { data, error } = await supabase
+    .from("french_dictionary")
+    .select("word")
+    .eq("word", word.trim().toUpperCase())
+    .maybeSingle();
+
+  if (error) return { inDictionary: false, rpcError: error.message };
+  return { inDictionary: !!data, rpcError: null };
+}
 // Fonction pour soumettre un mot dans le mode Bombe
 export async function submitBombGuessRemote(
   roomCode: string,
@@ -762,7 +776,7 @@ export async function submitBombGuessRemote(
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
   // 1. On vérifie que le mot existe dans le dictionnaire
-  const dictCheck = await wordleWordExistsRemote(word);
+  const dictCheck = await bombWordExistsRemote(word);
   if (!dictCheck.inDictionary) {
     return { ok: false, error: "Mot inconnu." };
   }
@@ -786,11 +800,9 @@ export async function submitBombGuessRemote(
   }
 
   const newConstraint = generateBombConstraint();
-  // On remet un peu de temps sur la bombe (ex: 10 à 20 secondes)
-  const timerSeconds = Math.floor(Math.random() * 11) + 10;
-  // On ajoute le temps *restant* au nouveau temps, max 30s
-  const timeLeft = Math.max(0, currentData.explosion_time - Date.now());
-  const newExplosionTime = Date.now() + Math.min(30000, timeLeft + (timerSeconds * 1000));
+  
+  // LE CHRONO NE BOUGE PLUS ! L'heure d'explosion reste la même qu'au début du round.
+  const newExplosionTime = currentData.explosion_time;
 
   const { error } = await supabase
     .from("rooms")
