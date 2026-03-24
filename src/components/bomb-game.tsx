@@ -37,29 +37,22 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
   // NOUVEAU : State pour stocker ce que les autres tapent
   const [liveTyping, setLiveTyping] = useState("");
   const channelRef = useRef<any>(null);
+  
 
   // NOUVEAU : Connexion au canal "Broadcast" de Supabase pour la frappe en temps réel
   useEffect(() => {
-    const supabase = getSupabaseBrowser();
+    const supabase = getSupabaseBrowser(); // Assure-toi que l'import est présent
     if (!supabase || !roomCode) return;
     
-    // On crée un canal spécifique pour cette salle
     const channel = supabase.channel(`bomb_typing_${roomCode}`);
-    
-    // On écoute les événements "type" envoyés par les autres
     channel.on("broadcast", { event: "type" }, ({ payload }) => {
-      // Si le message vient bien du joueur dont c'est le tour (et pas de nous-même)
       if (payload.playerId === currentTurnId && payload.playerId !== myPlayerId) {
         setLiveTyping(payload.word);
       }
     }).subscribe();
 
     channelRef.current = channel;
-
-    return () => { 
-      supabase.removeChannel(channel); 
-      channelRef.current = null;
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [roomCode, currentTurnId, myPlayerId]);
 
   // On vide la zone de frappe à chaque changement de tour OU de consigne (explosion)
@@ -235,8 +228,17 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
             disabled={!myTurn || busy}
             // Attention : S'il y a le mot "autoFocus" écrit ici, supprime-le absolument !
             onChange={(e) => {
-              setDraft(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""));
+              const word = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+              setDraft(word);
               setErr(null);
+              // DIFFUSION EN DIRECT
+              if (myTurn && channelRef.current) {
+                channelRef.current.send({
+                  type: "broadcast",
+                  event: "type",
+                  payload: { playerId: myPlayerId, word }
+                });
+              }
             }}
             placeholder={myTurn ? "Tape ton mot ici..." : "Attends ton tour..."}
             className="w-full text-center text-2xl font-black tracking-widest p-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-100 outline-none transition disabled:opacity-50"
@@ -260,13 +262,12 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
             </button>
           </form>
         ) : (
-          /* NOUVEAU : Vue spectateur quand ce n'est pas mon tour */
           <div className="flex flex-col items-center justify-center gap-3 py-2">
             <p className="text-sm font-bold text-slate-500 animate-pulse">
-              {currentPlayerName} réfléchit...
+              {players.find(p => p.id === currentTurnId)?.name} réfléchit...
             </p>
             <div className="w-full text-center min-h-[3.5rem] p-4 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50">
-              <span className={`text-2xl font-black tracking-widest ${liveTyping ? 'text-slate-800' : 'text-slate-300'}`}>
+              <span className="text-2xl font-black tracking-widest text-slate-800">
                 {liveTyping || "..."}
               </span>
             </div>

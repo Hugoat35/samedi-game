@@ -905,7 +905,6 @@ export async function handleBombExplosionRemote(
   return { ok: true };
 }
 
-// Fonction pour passer le tour d'un joueur déconnecté (silencieusement)
 export async function skipOfflinePlayerRemote(
   roomCode: string,
   currentData: any,
@@ -915,44 +914,42 @@ export async function skipOfflinePlayerRemote(
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
   const order = currentData.player_order as string[];
-  const currentIndex = currentData.turn_index as number;
-
-  let nextIndex = (currentIndex + 1) % order.length;
-  let attempts = 0;
   
-  // On cherche le prochain joueur en vie ET actuellement connecté
-  while (
-    (
-      (currentData.lives[order[nextIndex]] || 0) <= 0 || 
-      !connectedPlayerIds.includes(order[nextIndex])
-    ) && 
-    attempts < order.length
-  ) {
-    nextIndex = (nextIndex + 1) % order.length;
-    attempts++;
+  // 1. On identifie qui est encore "vraiment" en jeu (Connecté ET a encore des vies)
+  const activePlayers = order.filter(id => 
+    (currentData.lives[id] || 0) > 0 && connectedPlayerIds.includes(id)
+  );
+
+  // 2. S'il n'en reste qu'un ou moins : VICTOIRE IMMÉDIATE
+  if (activePlayers.length <= 1) {
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        game_state: "finished",
+        game_data: { ...currentData, status: "game_over" }
+      })
+      .eq("code", roomCode.trim());
+    return { ok: !error, error: error?.message || "" };
   }
 
-  // Si tout le monde est mort ou déconnecté, on arrête
-  if (attempts >= order.length) return { ok: true };
+  // 3. Sinon, si le joueur actuel est celui qui est parti, on passe au suivant
+  const currentIndex = currentData.turn_index;
+  const currentPlayerId = order[currentIndex];
 
-  // Sursis de 6 secondes pour ne pas pénaliser le joueur qui hérite de la bombe
-  const timeLeftMs = currentData.explosion_time - Date.now();
-  const newExplosionTime = timeLeftMs < 6000 
-    ? Date.now() + 6000 
-    : currentData.explosion_time;
+  if (!connectedPlayerIds.includes(currentPlayerId)) {
+    let nextIndex = (currentIndex + 1) % order.length;
+    while (!activePlayers.includes(order[nextIndex])) {
+      nextIndex = (nextIndex + 1) % order.length;
+    }
 
-  // On met à jour le tour vers le prochain joueur
-  const { error } = await supabase
-    .from("rooms")
-    .update({
-      game_data: {
-        ...currentData,
-        turn_index: nextIndex,
-        explosion_time: newExplosionTime,
-      },
-    })
-    .eq("code", roomCode.trim());
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        game_data: { ...currentData, turn_index: nextIndex }
+      })
+      .eq("code", roomCode.trim());
+    return { ok: !error, error: error?.message || "" };
+  }
 
-  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
