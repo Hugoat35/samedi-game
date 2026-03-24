@@ -63,6 +63,7 @@ export default function GameApp() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [isLeavingRoom, setIsLeavingRoom] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   
   const [pseudo, setPseudo] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -475,7 +476,7 @@ export default function GameApp() {
             Parties en ligne
           </h1>
         </div>
-        // Remplace le bloc de la ligne 393 à 410 par celui-ci :
+        
         {view !== "home" && (
           <div className="flex gap-2">
             {/* Nouveau bouton Retour pour l'hôte */}
@@ -490,7 +491,7 @@ export default function GameApp() {
             )}
 
             <button
-              onClick={() => void goHome()}
+              onClick={() => setShowExitConfirm(true)}
               disabled={busy}
               className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white sm:px-4 sm:py-2 sm:text-sm"
             >
@@ -967,6 +968,47 @@ export default function GameApp() {
 
         </AnimatePresence>
       </main>
-    </div>
+
+      {/* FENÊTRE DE CONFIRMATION (MODAL) 👇 */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm rounded-[2rem] bg-white p-6 shadow-2xl"
+            >
+              <h3 className="text-center text-lg font-bold text-slate-900">Quitter la partie ?</h3>
+              <p className="mt-2 text-center text-sm leading-relaxed text-slate-500">
+                {isHost 
+                  ? "Attention : en tant qu'hôte, si tu quittes, la salle sera fermée pour tous les joueurs." 
+                  : "Es-tu sûr de vouloir quitter la salle et revenir à l'accueil ?"}
+              </p>
+              
+              <div className="mt-6 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    void goHome(); // Appelle la fonction de sortie réelle
+                  }}
+                  className="w-full rounded-2xl bg-red-500 py-3 text-sm font-bold text-white shadow-md transition hover:bg-red-600 active:scale-95"
+                >
+                  Oui, quitter
+                </button>
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="w-full rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95"
+                >
+                  Non, rester
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div> // <-- C'est la toute dernière balise du fichier
   );
 }
+
+        
