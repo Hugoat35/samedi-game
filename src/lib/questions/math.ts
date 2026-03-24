@@ -14,8 +14,10 @@ type ASTNode =
   | { type: "op"; op: string; left: ASTNode; right: ASTNode };
 
 function generateMathTree(maxDepth: number): ASTNode {
-  if (maxDepth === 0 || Math.random() < 0.3) {
-    return { type: "num", value: randomIntBelow(12) + 2 }; 
+  // Moins de chances d'arrêter l'arbre tôt = calculs un peu plus longs (20% au lieu de 30%)
+  if (maxDepth === 0 || Math.random() < 0.2) {
+    // Les nombres de base vont de 3 à 17 pour éviter les calculs trop triviaux comme 2x2
+    return { type: "num", value: randomIntBelow(15) + 3 }; 
   }
   const ops = ["+", "+", "-", "-", "*", "/"];
   const op = ops[randomIntBelow(ops.length)];
@@ -98,14 +100,15 @@ function calculateDifficultyPoints(node: ASTNode): number {
 }
 
 // ============================================================================
-// MODE HARDCORE : CHRONOS TRÈS RÉDUITS
+// MODE HARDCORE : CHRONOS TRÈS RÉDUITS ET PUNITIFS
 // ============================================================================
 function calculateTimeLimit(points: number): number {
-  if (points <= 40) return 4;   // 4 secondes pour un calcul basique
-  if (points <= 60) return 5;   // 5 secondes
-  if (points <= 90) return 7;   // 7 secondes
-  if (points <= 120) return 9;  // 9 secondes
-  return 12;                    // 12 secondes maximum pour les pires calculs mentaux purs !
+  // 4 secondes c'est le minimum syndical pour lire, calculer de tête, taper et encaisser la latence réseau
+  if (points <= 40) return 4;   
+  if (points <= 60) return 5;   
+  if (points <= 90) return 7;   
+  if (points <= 120) return 9;  
+  return 12; // Pour les équations infernales à 4 chiffres avec parenthèses
 }
 
 function generateRandomCalculation() {
@@ -160,7 +163,7 @@ export function generateMathQuestion(): QuizQuestion {
       break;
     }
     
-    // --- LES PROBLÈMES : TEMPS DIVISÉS PAR DEUX (HARDCORE) ---
+    // --- LES PROBLÈMES : MODE SURVIE ÉQUILIBRÉ ---
 
     case "achats": {
       const budget = (randomIntBelow(5) + 5) * 10;
@@ -170,7 +173,7 @@ export function generateMathQuestion(): QuizQuestion {
       const nbStylos = randomIntBelow(3) + 3;
       questionText = `Problème : Léa a ${budget} €. Elle achète ${nbLivres} livres à ${prixLivre} € l'unité et ${nbStylos} stylos à ${prixStylo} € l'unité. Combien d'euros lui reste-t-il ?`;
       answer = budget - (nbLivres * prixLivre) - (nbStylos * prixStylo);
-      timeLimit = 20;
+      timeLimit = 15; 
       points = 150;
       break;
     }
@@ -181,7 +184,7 @@ export function generateMathQuestion(): QuizQuestion {
       const t2 = randomIntBelow(2) + 1;
       questionText = `Problème : Un train roule à ${v1} km/h pendant ${t1}h, puis à ${v2} km/h pendant ${t2}h. Quelle distance totale a-t-il parcourue ?`;
       answer = (v1 * t1) + (v2 * t2);
-      timeLimit = 18;
+      timeLimit = 14; 
       points = 140;
       break;
     }
@@ -192,7 +195,7 @@ export function generateMathQuestion(): QuizQuestion {
       const nouveaux = randomIntBelow(10) + 10;
       questionText = `Problème : Sur ${base} survivants, ${infectes} sont infectés, mais ${gueris} guérissent. Si ${nouveaux} personnes rejoignent le camp, combien y a-t-il de survivants sains ?`;
       answer = base - infectes + gueris + nouveaux;
-      timeLimit = 18;
+      timeLimit = 14; 
       points = 130;
       break;
     }
@@ -202,7 +205,7 @@ export function generateMathQuestion(): QuizQuestion {
       const anneesPlusTard = randomIntBelow(5) + 5;
       questionText = `Problème : Léo a ${ageEnfant} ans. Son père est ${multiplicateur} fois plus âgé que lui. Quel âge aura le père dans ${anneesPlusTard} ans ?`;
       answer = (ageEnfant * multiplicateur) + anneesPlusTard;
-      timeLimit = 15;
+      timeLimit = 11; 
       points = 120;
       break;
     }
@@ -212,7 +215,7 @@ export function generateMathQuestion(): QuizQuestion {
       const temps = randomIntBelow(4) + 5;
       questionText = `Problème : Un bassin vide est rempli de ${remplissage} L/min, mais il fuit de ${fuite} L/min. Quel sera le volume d'eau après ${temps} minutes ?`;
       answer = (remplissage - fuite) * temps;
-      timeLimit = 20;
+      timeLimit = 14; 
       points = 150;
       break;
     }
@@ -223,7 +226,7 @@ export function generateMathQuestion(): QuizQuestion {
       const totalTresor = partCapitaine + (nbMarins * partMarin);
       questionText = `Problème : Sur un trésor de ${totalTresor} pièces, le capitaine prend ${partCapitaine} pièces. Le reste est divisé équitablement entre ${nbMarins} marins. Combien chacun reçoit-il ?`;
       answer = partMarin;
-      timeLimit = 20;
+      timeLimit = 15; 
       points = 140; 
       break;
     }
@@ -234,7 +237,7 @@ export function generateMathQuestion(): QuizQuestion {
       const nbStd = (randomIntBelow(4) + 2) * 10; 
       questionText = `Problème : Un concert a vendu ${nbVip} places VIP à ${prixVip} € et ${nbStd} places standards à ${prixStd} €. Quelle est la recette totale ?`;
       answer = (nbVip * prixVip) + (nbStd * prixStd);
-      timeLimit = 18;
+      timeLimit = 14; 
       points = 130;
       break;
     }
@@ -246,7 +249,7 @@ export function generateMathQuestion(): QuizQuestion {
       const degats = randomIntBelow(4) + 15; 
       questionText = `Problème : Un héros a ${hpMax} PV. Il boit ${nbPotions} potions qui rendent ${soin} PV chacune, puis subit ${nbAttaques} attaques à ${degats} PV chacune. Combien lui reste-t-il de PV ?`;
       answer = hpMax + (nbPotions * soin) - (nbAttaques * degats);
-      timeLimit = 22;
+      timeLimit = 16; 
       points = 160; 
       break;
     }
@@ -256,7 +259,7 @@ export function generateMathQuestion(): QuizQuestion {
       const nbBaguettes = randomIntBelow(5) + 8; 
       questionText = `Problème : Un boulanger a ${kgFarine} kg de farine. Il prépare ${nbBaguettes} baguettes nécessitant ${consoBaguette} g de farine chacune. Combien de grammes lui reste-t-il ?`;
       answer = (kgFarine * 1000) - (nbBaguettes * consoBaguette);
-      timeLimit = 20;
+      timeLimit = 15; 
       points = 150;
       break;
     }
@@ -268,7 +271,7 @@ export function generateMathQuestion(): QuizQuestion {
       const dist2 = 15; 
       questionText = `Problème : Un vaisseau part avec ${carburantInit} L et consomme ${consoSecteur} L par secteur. Il avance de ${dist1} secteurs, recharge ${recharge} L, puis avance de ${dist2} secteurs. Combien de litres lui reste-t-il ?`;
       answer = carburantInit - (dist1 * consoSecteur) + recharge - (dist2 * consoSecteur);
-      timeLimit = 25;
+      timeLimit = 18; 
       points = 180; 
       break;
     }

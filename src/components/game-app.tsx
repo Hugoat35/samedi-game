@@ -887,10 +887,10 @@ export default function GameApp() {
                               <span className="text-xs font-bold text-slate-700 sm:text-sm">Thèmes activés</span>
                               <button
                                 type="button"
-                                onClick={() => setActiveThemes(ALL_THEMES)}
+                                onClick={() => setActiveThemes(activeThemes.length === ALL_THEMES.length ? [] : ALL_THEMES)}
                                 className="text-[10px] text-violet-600 hover:underline font-bold"
                               >
-                                Tout cocher
+                                {activeThemes.length === ALL_THEMES.length ? "Tout décocher" : "Tout cocher"}
                               </button>
                             </div>
                             <div className="flex flex-wrap gap-1.5">
@@ -901,10 +901,11 @@ export default function GameApp() {
                                     key={theme}
                                     type="button"
                                     onClick={() => toggleTheme(theme)}
-                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border sm:text-xs ${
+                                    style={{ WebkitTapHighlightColor: "transparent" }}
+                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors border outline-none select-none sm:text-xs ${
                                       isActive 
-                                        ? "bg-violet-100 border-violet-200 text-violet-700 shadow-sm" 
-                                        : "bg-white border-slate-200 text-slate-400 opacity-60 hover:opacity-100"
+                                        ? "bg-violet-100 border-violet-300 text-violet-700 shadow-sm" 
+                                        : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 hover:bg-slate-100"
                                     }`}
                                   >
                                     {isActive ? "✓" : "+"} {theme}
