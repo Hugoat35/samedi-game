@@ -904,3 +904,55 @@ export async function handleBombExplosionRemote(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+// Fonction pour passer le tour d'un joueur déconnecté (silencieusement)
+export async function skipOfflinePlayerRemote(
+  roomCode: string,
+  currentData: any,
+  connectedPlayerIds: string[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const order = currentData.player_order as string[];
+  const currentIndex = currentData.turn_index as number;
+
+  let nextIndex = (currentIndex + 1) % order.length;
+  let attempts = 0;
+  
+  // On cherche le prochain joueur en vie ET actuellement connecté
+  while (
+    (
+      (currentData.lives[order[nextIndex]] || 0) <= 0 || 
+      !connectedPlayerIds.includes(order[nextIndex])
+    ) && 
+    attempts < order.length
+  ) {
+    nextIndex = (nextIndex + 1) % order.length;
+    attempts++;
+  }
+
+  // Si tout le monde est mort ou déconnecté, on arrête
+  if (attempts >= order.length) return { ok: true };
+
+  // Sursis de 6 secondes pour ne pas pénaliser le joueur qui hérite de la bombe
+  const timeLeftMs = currentData.explosion_time - Date.now();
+  const newExplosionTime = timeLeftMs < 6000 
+    ? Date.now() + 6000 
+    : currentData.explosion_time;
+
+  // On met à jour le tour vers le prochain joueur
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: {
+        ...currentData,
+        turn_index: nextIndex,
+        explosion_time: newExplosionTime,
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

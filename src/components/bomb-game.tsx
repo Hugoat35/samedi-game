@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useMemo, useRef } from "react";
 import type { Player } from "@/lib/lobby-types";
-import { submitBombGuessRemote, handleBombExplosionRemote, returnToLobbyRemote } from "@/lib/lobby-remote";
+import { submitBombGuessRemote, handleBombExplosionRemote, returnToLobbyRemote, skipOfflinePlayerRemote } from "@/lib/lobby-remote";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
 
 
@@ -83,6 +83,25 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
       }).catch(() => {});
     }
   };
+
+  // L'hôte surveille si le joueur actuel a quitté la salle
+  useEffect(() => {
+    if (!isHost || status !== "playing" || !currentTurnId) return;
+
+    const isCurrentPlayerPresent = players.some(p => p.id === currentTurnId);
+    
+    if (!isCurrentPlayerPresent && !busy) {
+      const skip = async () => {
+        setBusy(true);
+        // On liste les IDs de ceux qui sont encore là
+        const connectedIds = players.map(p => p.id);
+        await skipOfflinePlayerRemote(roomCode, gd, connectedIds);
+        setBusy(false);
+      };
+      void skip();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHost, status, currentTurnId, players]);
 
   // Moteur du chronomètre (tourne à 60fps pour la fluidité)
   useEffect(() => {
