@@ -810,8 +810,14 @@ export async function submitBombGuessRemote(
 
   const newConstraint = generateBombConstraint();
   
-  // LE CHRONO NE BOUGE PLUS ! L'heure d'explosion reste la même qu'au début du round.
-  const newExplosionTime = currentData.explosion_time;
+  // CALCUL DU SURSIS (6 SECONDES)
+  const timeLeftMs = currentData.explosion_time - Date.now();
+  
+  // Si le joueur passe la bombe alors qu'il reste moins de 6 secondes, 
+  // on redonne exactement 6 secondes au joueur suivant. Sinon, on ne touche à rien.
+  const newExplosionTime = timeLeftMs < 6000 
+    ? Date.now() + 6000 
+    : currentData.explosion_time;
 
   const { error } = await supabase
     .from("rooms")
