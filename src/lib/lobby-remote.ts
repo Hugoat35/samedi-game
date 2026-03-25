@@ -1,6 +1,6 @@
 import type { Player } from "@/lib/lobby-types";
 import { getSupabaseBrowser } from "@/lib/supabase/browser-client";
-import { generateBombConstraint, type BombConstraint } from "./questions/bomb";
+import { generateBombConstraint, checkConstraint, type BombConstraint } from "./questions/bomb";
 import { getRandomQuestionsByTheme, type QuestionDifficulty } from "./quiz-bank";
 
 
@@ -784,28 +784,34 @@ export async function submitBombGuessRemote(
   roomCode: string,
   playerId: string,
   word: string,
-  currentData: any // On passe game_data pour éviter un fetch supplémentaire
+  currentData: any
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  // 1. On vérifie que le mot existe dans le dictionnaire
+  // 1. On vérifie que le mot respecte bien LA CONSIGNE ACTUELLE
+  // (Sinon, on pourrait écrire n'importe quel mot du dictionnaire !)
+  const currentConstraint = currentData.current_constraint as BombConstraint;
+  if (!checkConstraint(word, currentConstraint)) {
+    return { ok: false, error: "Ne respecte pas la consigne." };
+  }
+
+  // 2. On vérifie que le mot existe dans le dictionnaire
   const dictCheck = await bombWordExistsRemote(word);
   if (!dictCheck.inDictionary) {
     return { ok: false, error: "Mot inconnu." };
   }
 
-  // 2. On vérifie qu'il n'a pas déjà été dit
+  // 3. On vérifie qu'il n'a pas déjà été dit
   const usedWords = currentData.used_words || [];
   if (usedWords.includes(word.toUpperCase())) {
     return { ok: false, error: "Mot déjà utilisé !" };
   }
 
-  // 3. C'est bon ! On passe au joueur suivant et on régénère une consigne
+  // 4. C'est bon ! On cherche le prochain joueur en vie
   const order = currentData.player_order as string[];
   const currentIndex = currentData.turn_index as number;
   
-  // Trouver le prochain joueur en vie
   let nextIndex = (currentIndex + 1) % order.length;
   let attempts = 0;
   while ((currentData.lives[order[nextIndex]] || 0) <= 0 && attempts < order.length) {
@@ -816,14 +822,19 @@ export async function submitBombGuessRemote(
   const difficulty = currentData.bomb_settings?.difficulty || "normal";
   const newConstraint = generateBombConstraint(difficulty);
   
-  // CALCUL DU SURSIS (6 SECONDES)
+  // CALCUL DU TEMPS : Sursis + Bonus de vitesse
   const timeLeftMs = currentData.explosion_time - Date.now();
   
-  // Si le joueur passe la bombe alors qu'il reste moins de 6 secondes, 
-  // on redonne exactement 6 secondes au joueur suivant. Sinon, on ne touche à rien.
-  const newExplosionTime = timeLeftMs < 6000 
-    ? Date.now() + 6000 
-    : currentData.explosion_time;
+  // BONUS : Le joueur gagne +2 secondes (2000 ms) pour avoir trouvé un mot
+  let newTimeLeftMs = timeLeftMs + 2000;
+  
+  // SÉCURITÉ : On ne dépasse pas 45 secondes pour ne pas rendre la partie infinie
+  if (newTimeLeftMs > 45000) newTimeLeftMs = 45000;
+  
+  // SURSIS : On garantit au moins 6 secondes au joueur suivant
+  if (newTimeLeftMs < 6000) newTimeLeftMs = 6000;
+
+  const newExplosionTime = Date.now() + newTimeLeftMs;
 
   const { error } = await supabase
     .from("rooms")
