@@ -751,10 +751,9 @@ export default function GameApp() {
                         </span>
                         <span className="min-w-0 flex-1 truncate font-bold text-slate-800 text-sm sm:text-base">{p.name}</span>
                         {/* SCORE GLOBAL */}
-                        <div className="shrink-0 flex items-center justify-center gap-1 rounded-lg bg-amber-100 px-2 py-1 shadow-inner">
-                          <span className="text-xs font-black text-amber-700 sm:text-sm">{p.score || 0}</span>
-                          <span className="text-xs sm:text-sm">🏆</span>
-                        </div>
+                          <div className="shrink-0 flex items-center justify-center rounded-lg bg-amber-100 px-2 py-1 shadow-inner">
+                            <span className="text-xs font-black text-amber-700 sm:text-sm">{p.score || 0}</span>
+                          </div>
                         {p.id === myPlayerId && (
                           <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-600 sm:text-xs">
                             MOI
@@ -822,17 +821,62 @@ export default function GameApp() {
                         </div>
 
                         {selectedGame === "wordle-team" ? (
-                          <>
+                          <div className="flex flex-col gap-3">
                             <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
-                              Un mot secret caché pour tous : mêmes indices, tour à tour. Ordre mélangé à chaque
-                              manche.
+                              Un mot secret caché pour tous : mêmes indices, tour à tour. L'ordre des joueurs est mélangé à chaque manche.
                             </p>
-                            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 sm:px-4">
-                              <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-800 sm:text-xs">
-                                Longueur des mots ({WORDLE_LEN_LO}–{WORDLE_LEN_HI} lettres)
+
+                            {/* 1. MANCHES */}
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
+                              <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                                <span className="font-bold text-emerald-800">Nombre de manches</span>
+                                <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums">
+                                  {wordleRounds}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="1"
+                                max="15"
+                                step="1"
+                                value={wordleRounds}
+                                onChange={(e) => setWordleRounds(Number(e.target.value))}
+                                className="mb-1 mt-2 w-full accent-emerald-600"
+                              />
+                            </div>
+
+                            {/* 2. CHRONOMÈTRE */}
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
+                              <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                                <span className="font-bold text-emerald-800">Temps de réflexion</span>
+                                <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums">
+                                  {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="10"
+                                max="130"
+                                step="10"
+                                value={wordleTimer}
+                                onChange={(e) => setWordleTimer(Number(e.target.value))}
+                                className="mb-1 mt-2 w-full accent-emerald-600"
+                              />
+                            </div>
+
+                            {/* 3. LONGUEUR DES MOTS */}
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
+                              <p className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-emerald-800 sm:text-xs">
+                                <span>Taille des mots</span>
+                                <span className="font-mono tabular-nums text-emerald-600">
+                                  {wordleLenMin === wordleLenMax
+                                    ? `${wordleLenMin} lettres`
+                                    : `${wordleLenMin} - ${wordleLenMax} lettres`}
+                                </span>
                               </p>
+                              
                               <div className="mb-2 flex items-center gap-2 sm:gap-3">
-                                <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
+                                <span className="w-8 shrink-0 text-[10px] font-bold text-slate-500 sm:w-10 sm:text-xs">
                                   Min
                                 </span>
                                 <input
@@ -845,16 +889,13 @@ export default function GameApp() {
                                     const v = Number(e.target.value);
                                     setWordleLenMin(Math.min(v, wordleLenMax));
                                   }}
-                                  className="min-h-9 flex-1 cursor-pointer accent-emerald-600"
+                                  className="min-h-8 flex-1 cursor-pointer accent-emerald-500"
                                   aria-label="Longueur minimale des mots"
                                 />
-                                <span className="w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-emerald-700 sm:w-8">
-                                  {wordleLenMin}
-                                </span>
                               </div>
 
-                              <div className="mb-2 flex items-center gap-2 sm:gap-3">
-                                <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
+                              <div className="mb-3 flex items-center gap-2 sm:gap-3">
+                                <span className="w-8 shrink-0 text-[10px] font-bold text-slate-500 sm:w-10 sm:text-xs">
                                   Max
                                 </span>
                                 <input
@@ -867,14 +908,13 @@ export default function GameApp() {
                                     const v = Number(e.target.value);
                                     setWordleLenMax(Math.max(v, wordleLenMin));
                                   }}
-                                  className="min-h-9 flex-1 cursor-pointer accent-teal-600"
+                                  className="min-h-8 flex-1 cursor-pointer accent-teal-500"
                                   aria-label="Longueur maximale des mots"
                                 />
-                                <span className="w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-teal-700 sm:w-8">
-                                  {wordleLenMax}
-                                </span>
                               </div>
-                              <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-200">
+                              
+                              {/* Barre visuelle de la plage sélectionnée */}
+                              <div className="relative mb-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
                                 <div
                                   className="absolute inset-y-0 rounded-full bg-emerald-500"
                                   style={{
@@ -883,48 +923,8 @@ export default function GameApp() {
                                   }}
                                 />
                               </div>
-                              <p className="mt-2 text-center text-[10px] font-semibold text-emerald-800 sm:text-xs">
-                                {wordleLenMin === wordleLenMax
-                                  ? `Fixé à ${wordleLenMin} lettre${wordleLenMin > 1 ? "s" : ""}`
-                                  : `Plage active : ${wordleLenMin} à ${wordleLenMax} lettres`}
-                              </p>
                             </div>
-
-                                  {/* NOUVEAU : TEMPS PAR JOUEUR */}
-                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 sm:px-4 mt-3">
-                                  <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                                    <span className="font-bold text-blue-800">Temps de réflexion</span>
-                                    <span className="font-mono text-lg font-bold text-blue-600 tabular-nums">
-                                      {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="10"
-                                    max="130"
-                                    step="10"
-                                    value={wordleTimer}
-                                    onChange={(e) => setWordleTimer(Number(e.target.value))}
-                                    className="mb-1 mt-2 w-full accent-blue-600"
-                                  />
-                                </div>
-
-                            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                              <span className="font-semibold text-slate-600">Manches</span>
-                              <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums sm:text-xl">
-                                {wordleRounds}
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min="1"
-                              max="15"
-                              step="1"
-                              value={wordleRounds}
-                              onChange={(e) => setWordleRounds(Number(e.target.value))}
-                              className="mb-1 w-full accent-emerald-600"
-                            />
-                          </>
+                          </div>
                           ) : selectedGame === "bomb-game" ? (
                           <div className="flex flex-col gap-3">
                             <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
