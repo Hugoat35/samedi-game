@@ -847,25 +847,6 @@ export default function GameApp() {
                                 </span>
                               </div>
 
-                                 {/* NOUVEAU : TEMPS PAR JOUEUR */}
-                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 sm:px-4 mt-3">
-                                  <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                                    <span className="font-bold text-blue-800">Temps de réflexion</span>
-                                    <span className="font-mono text-lg font-bold text-blue-600 tabular-nums">
-                                      {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="10"
-                                    max="130"
-                                    step="10"
-                                    value={wordleTimer}
-                                    onChange={(e) => setWordleTimer(Number(e.target.value))}
-                                    className="mb-1 mt-2 w-full accent-blue-600"
-                                  />
-                                </div>
-
                               <div className="mb-2 flex items-center gap-2 sm:gap-3">
                                 <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
                                   Max
@@ -902,6 +883,26 @@ export default function GameApp() {
                                   : `Plage active : ${wordleLenMin} à ${wordleLenMax} lettres`}
                               </p>
                             </div>
+
+                                  {/* NOUVEAU : TEMPS PAR JOUEUR */}
+                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 sm:px-4 mt-3">
+                                  <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                                    <span className="font-bold text-blue-800">Temps de réflexion</span>
+                                    <span className="font-mono text-lg font-bold text-blue-600 tabular-nums">
+                                      {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="10"
+                                    max="130"
+                                    step="10"
+                                    value={wordleTimer}
+                                    onChange={(e) => setWordleTimer(Number(e.target.value))}
+                                    className="mb-1 mt-2 w-full accent-blue-600"
+                                  />
+                                </div>
+
                             <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                               <span className="font-semibold text-slate-600">Manches</span>
                               <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums sm:text-xl">
