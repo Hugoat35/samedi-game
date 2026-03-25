@@ -168,16 +168,32 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
       
       {/* HUD : Vies des joueurs */}
       <div className="w-full flex flex-wrap justify-center gap-2 p-4 bg-white/80 rounded-3xl shadow-sm border border-slate-100">
-        {players.map(p => (
-          <div key={p.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${p.id === currentTurnId ? 'bg-rose-50 border-rose-200 ring-2 ring-rose-400' : 'bg-white border-slate-200'}`}>
-            <span className="text-xs font-bold text-slate-700 truncate max-w-[80px]">{p.name}</span>
-            <div className="flex gap-0.5">
-              {[...Array(2)].map((_, i) => (
-                <span key={i} className={`text-sm ${i < (lives[p.id] || 0) ? '' : 'grayscale opacity-30'}`}>❤️</span>
-              ))}
-            </div>
-          </div>
-        ))}
+        {players.map(p => {
+          const isActive = p.id === currentTurnId;
+          const playerLives = lives[p.id] || 0;
+          const isDead = playerLives <= 0;
+
+          return (
+            <motion.div 
+              key={p.id} 
+              animate={isActive ? { scale: 1.05 } : { scale: 1 }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all duration-300 ${
+                isActive 
+                  ? 'bg-rose-100 border-rose-400 ring-4 ring-rose-500/50 shadow-md z-10' 
+                  : isDead
+                  ? 'bg-slate-100 border-slate-200 opacity-40 grayscale'
+                  : 'bg-white border-slate-200 opacity-60'
+              }`}
+            >
+              <span className={`text-xs font-bold truncate max-w-[80px] ${isActive ? 'text-rose-900' : 'text-slate-700'}`}>
+                {p.name}
+              </span>
+              <div className="flex gap-0.5 text-sm">
+                {isDead ? '💀' : '❤️'.repeat(playerLives)}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* ZONE CENTRALE : La Bombe (chrono masqué) */}
@@ -191,7 +207,13 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
       </div>
 
       {/* CONSIGNE & MOTS DÉJÀ UTILISÉS */}
-      <div className="w-full text-center p-4 bg-rose-500 rounded-2xl shadow-lg border-b-4 border-rose-700 text-white flex flex-col items-center gap-2">
+      <motion.div 
+        key={currentTurnId + constraint?.label} // Déclenche l'animation à chaque changement
+        initial={{ scale: 0.95, filter: "brightness(1.5)" }}
+        animate={{ scale: 1, filter: "brightness(1)" }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="w-full text-center p-4 bg-rose-500 rounded-2xl shadow-lg border-b-4 border-rose-700 text-white flex flex-col items-center gap-2"
+      >
         <div className="w-full">
           <p className="text-sm font-semibold opacity-90 mb-1">
             {myTurn ? "À TON TOUR ! TROUVE UN MOT QUI :" : `Tour de ${currentPlayerName} :`}
@@ -214,35 +236,42 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* ZONE DE SAISIE ET D'AFFICHAGE EN TEMPS RÉEL */}
       <div className="w-full p-4 bg-white/90 rounded-3xl shadow-md border border-slate-100 mt-auto sm:mt-4">
         
         {myTurn ? (
-          <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-2">
+          <motion.form 
+            onSubmit={(e) => { e.preventDefault(); submit(); }} 
+            className="flex flex-col gap-2"
+            animate={err ? { x: [-8, 8, -8, 8, 0] } : {}} // <-- L'effet Shake en cas d'erreur !
+            transition={{ duration: 0.3 }}
+          >
             <input
-            ref={inputRef} // <-- NOUVEAU
-            type="text"
-            value={draft}
-            disabled={!myTurn || busy}
-            // Attention : S'il y a le mot "autoFocus" écrit ici, supprime-le absolument !
-            onChange={(e) => {
-              const word = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
-              setDraft(word);
-              setErr(null);
-              // DIFFUSION EN DIRECT
-              if (myTurn && channelRef.current) {
-                channelRef.current.send({
-                  type: "broadcast",
-                  event: "type",
-                  payload: { playerId: myPlayerId, word }
-                });
-              }
-            }}
-            placeholder={myTurn ? "Tape ton mot ici..." : "Attends ton tour..."}
-            className="w-full text-center text-2xl font-black tracking-widest p-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-100 outline-none transition disabled:opacity-50"
-          />
+              ref={inputRef}
+              type="text"
+              value={draft}
+              disabled={!myTurn || busy}
+              onChange={(e) => {
+                const word = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+                setDraft(word);
+                setErr(null);
+                if (myTurn && channelRef.current) {
+                  channelRef.current.send({
+                    type: "broadcast",
+                    event: "type",
+                    payload: { playerId: myPlayerId, word }
+                  });
+                }
+              }}
+              placeholder={myTurn ? "Tape ton mot ici..." : "Attends ton tour..."}
+              className={`w-full text-center text-2xl font-black tracking-widest p-4 rounded-xl border-2 outline-none transition disabled:opacity-50 ${
+                err 
+                  ? "bg-rose-50 border-rose-500 text-rose-700 focus:ring-rose-200" // <-- Le style Rouge en cas d'erreur
+                  : "bg-slate-50 border-slate-200 text-slate-800 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+              }`}
+            />
             <AnimatePresence>
               {err && (
                 <motion.p 
@@ -260,7 +289,7 @@ export default function BombGame({ roomCode, roomState, myPlayerId, isHost, play
             >
               {busy ? "Vérification..." : "Passer la bombe !"}
             </button>
-          </form>
+          </motion.form>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-2">
             <p className="text-sm font-bold text-slate-500 animate-pulse">

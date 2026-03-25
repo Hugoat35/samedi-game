@@ -819,20 +819,22 @@ export async function submitBombGuessRemote(
     attempts++;
   }
 
+  // GÉNÉRATION DE LA PROCHAINE RÈGLE
   const difficulty = currentData.bomb_settings?.difficulty || "normal";
   const newConstraint = generateBombConstraint(difficulty);
   
-  // CALCUL DU TEMPS : Sursis + Bonus de vitesse
+  // CALCUL DU BONUS SELON LA DIFFICULTÉ
+  let bonusMs = 2000; // Facile (+2 secondes)
+  if (difficulty === "normal") bonusMs = 3000; // Moyen (+3 secondes)
+  if (difficulty === "difficile") bonusMs = 5000; // Difficile (+5 secondes)
+
+  // LOGIQUE DU TEMPS (Bonus + Sursis)
   const timeLeftMs = currentData.explosion_time - Date.now();
+  let newTimeLeftMs = timeLeftMs + bonusMs;
   
-  // BONUS : Le joueur gagne +2 secondes (2000 ms) pour avoir trouvé un mot
-  let newTimeLeftMs = timeLeftMs + 2000;
-  
-  // SÉCURITÉ : On ne dépasse pas 45 secondes pour ne pas rendre la partie infinie
-  if (newTimeLeftMs > 45000) newTimeLeftMs = 45000;
-  
-  // SURSIS : On garantit au moins 6 secondes au joueur suivant
-  if (newTimeLeftMs < 6000) newTimeLeftMs = 6000;
+  // SÉCURITÉS
+  if (newTimeLeftMs > 45000) newTimeLeftMs = 45000; // Max 45 secondes au total
+  if (newTimeLeftMs < 6000) newTimeLeftMs = 6000;  // Sursis min 6 secondes
 
   const newExplosionTime = Date.now() + newTimeLeftMs;
 
@@ -962,10 +964,20 @@ export async function skipOfflinePlayerRemote(
       nextIndex = (nextIndex + 1) % order.length;
     }
 
+    // SURSIS DE 6 SECONDES POUR LE JOUEUR QUI RÉCUPÈRE LA BOMBE
+    const timeLeftMs = currentData.explosion_time - Date.now();
+    const newExplosionTime = timeLeftMs < 6000 
+      ? Date.now() + 6000 
+      : currentData.explosion_time;
+
     const { error } = await supabase
       .from("rooms")
       .update({
-        game_data: { ...currentData, turn_index: nextIndex }
+        game_data: { 
+          ...currentData, 
+          turn_index: nextIndex,
+          explosion_time: newExplosionTime // On met à jour le temps !
+        }
       })
       .eq("code", roomCode.trim());
     return { ok: !error, error: error?.message || "" };
