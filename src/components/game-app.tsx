@@ -827,9 +827,9 @@ export default function GameApp() {
                             </p>
 
                             {/* 1. MANCHES */}
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3 shadow-sm">
                               <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                                <span className="font-bold text-emerald-800">Nombre de manches</span>
+                                <span className="font-bold text-slate-700">Nombre de manches</span>
                                 <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums">
                                   {wordleRounds}
                                 </span>
@@ -846,9 +846,9 @@ export default function GameApp() {
                             </div>
 
                             {/* 2. CHRONOMÈTRE */}
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3 shadow-sm">
                               <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                                <span className="font-bold text-emerald-800">Temps de réflexion</span>
+                                <span className="font-bold text-slate-700">Temps de réflexion</span>
                                 <span className="font-mono text-lg font-bold text-emerald-600 tabular-nums">
                                   {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
                                 </span>
@@ -865,8 +865,8 @@ export default function GameApp() {
                             </div>
 
                             {/* 3. LONGUEUR DES MOTS */}
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-3 py-2.5 shadow-sm sm:px-4">
-                              <p className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-emerald-800 sm:text-xs">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3 shadow-sm">
+                              <p className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-700 sm:text-xs">
                                 <span>Taille des mots</span>
                                 <span className="font-mono tabular-nums text-emerald-600">
                                   {wordleLenMin === wordleLenMax
@@ -908,7 +908,7 @@ export default function GameApp() {
                                     const v = Number(e.target.value);
                                     setWordleLenMax(Math.max(v, wordleLenMin));
                                   }}
-                                  className="min-h-8 flex-1 cursor-pointer accent-teal-500"
+                                  className="min-h-8 flex-1 cursor-pointer accent-emerald-500"
                                   aria-label="Longueur maximale des mots"
                                 />
                               </div>
