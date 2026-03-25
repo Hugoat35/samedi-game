@@ -102,7 +102,9 @@ function PlayerFace({
 }
 
 function parseYear(s: string): number | null {
-  const n = parseInt(String(s).replace(/\D/g, ""), 10);
+  // On remplace tout ce qui n'est NI un chiffre, NI un signe moins
+  const cleaned = String(s).replace(/[^-0-9]/g, "");
+  const n = parseInt(cleaned, 10);
   return Number.isFinite(n) ? n : null;
 }
 

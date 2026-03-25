@@ -32,7 +32,7 @@ export async function createRoomRemote(playerName: string, avatar: string): Prom
     const { data: inserted, error: playerErr } = await supabase
       .from("lobby_players")
       .insert({ room_code: code, display_name: playerName, avatar })
-      .select("id, display_name, avatar")
+      .select("id, display_name, avatar, global_score")
       .single();
 
     if (playerErr) {
@@ -45,7 +45,12 @@ export async function createRoomRemote(playerName: string, avatar: string): Prom
       code,
       myPlayerId: inserted.id,
       players: [
-        { id: inserted.id, name: inserted.display_name ?? "Hôte", avatar: inserted.avatar },
+        { 
+          id: inserted.id, 
+          name: inserted.display_name ?? "Hôte", 
+          avatar: inserted.avatar, 
+          score: inserted.global_score ?? 0 
+        },
       ],
     };
   }
@@ -81,7 +86,7 @@ export async function joinRoomRemote(
 
   const { data: rows, error: listErr } = await supabase
     .from("lobby_players")
-    .select("id, display_name, avatar")
+    .select("id, display_name, avatar, global_score")
     .eq("room_code", code)
     .order("created_at", { ascending: true });
 
@@ -91,10 +96,11 @@ export async function joinRoomRemote(
     ok: true,
     code,
     myPlayerId: newRow.id,
-    players: (rows ?? []).map((r) => ({
+    players: (rows ?? []).map((r: any) => ({
       id: r.id,
       name: r.display_name ?? "?",
       avatar: r.avatar,
+      score: r.global_score ?? 0,
     })),
   };
 }
@@ -126,17 +132,18 @@ export async function fetchPlayersRemote(roomCode: string): Promise<
 
   const { data, error } = await supabase
     .from("lobby_players")
-    .select("id, display_name, avatar")
+    .select("id, display_name, avatar, global_score")
     .eq("room_code", roomCode.trim())
     .order("created_at", { ascending: true });
 
   if (error) return { ok: false, error: error.message };
   return {
     ok: true,
-    players: (data ?? []).map((r) => ({
+    players: (data ?? []).map((r: any) => ({
       id: r.id,
       name: r.display_name ?? "?",
       avatar: r.avatar,
+      score: r.global_score ?? 0,
     })),
   };
 }
@@ -399,11 +406,26 @@ export async function startGameRemote(
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  const selectedQuestions = getRandomQuestionsByTheme(questionCount, activeThemes as any, difficulties);
+  // 1. On récupère la mémoire des lettres de la partie d'avant !
+  const { data: roomData } = await supabase
+    .from("rooms")
+    .select("game_data")
+    .eq("code", roomCode.trim())
+    .single();
+    
+  const existingGd = (roomData?.game_data || {}) as Record<string, any>;
+  const oldWeights = existingGd.minibac_weights || {};
+
+  // 2. On génère les questions en lui passant la mémoire
+  const result = getRandomQuestionsByTheme(questionCount, activeThemes as any, difficulties, oldWeights);
+  const selectedQuestions = result.questions;
+  const newWeights = result.newWeights; // La nouvelle mémoire
   
   if (selectedQuestions.length === 0) {
     return { ok: false, error: "Aucune question trouvée pour cette combinaison. Cochez plus de thèmes/difficultés !" };
   }
+
+  // 3. On sauvegarde tout ça dans Supabase
   const { error } = await supabase
     .from("rooms")
     .update({
@@ -414,6 +436,7 @@ export async function startGameRemote(
         scores: {},
         minibac_history: [] as MinibacHistoryEntry[],
         answer_order: [] as string[],
+        minibac_weights: newWeights, // On sauvegarde la mémoire des lettres pour la manche suivante !
       },
       current_question_index: 0,
     })
@@ -703,6 +726,27 @@ export async function returnToLobbyRemote(roomCode: string) {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false };
 
+  // 1. Récupérer les scores de la partie qui vient de se terminer
+  const { data } = await supabase.from("rooms").select("game_data").eq("code", roomCode.trim()).single();
+  const gd = (data?.game_data || {}) as Record<string, any>;
+  
+  let pointsToAdd: Record<string, number> = {};
+  
+  if (gd.game_kind === "bomb") {
+    const lives = gd.lives || {};
+    for (const [pid, l] of Object.entries(lives)) {
+      if ((l as number) > 0) pointsToAdd[pid] = 100; // 100 pts pour les survivants de la bombe !
+    }
+  } else {
+    pointsToAdd = gd.scores || {};
+  }
+
+  // 2. Ajouter ces points au score global via la fonction SQL
+  if (Object.keys(pointsToAdd).length > 0) {
+    await supabase.rpc("add_global_scores", { p_code: roomCode.trim(), p_scores: pointsToAdd });
+  }
+
+  // 3. Retourner au salon
   const { error } = await supabase
     .from("rooms")
     .update({ game_state: "lobby" })

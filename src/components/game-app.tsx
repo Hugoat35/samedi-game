@@ -283,6 +283,7 @@ export default function GameApp() {
 
   const playersRaw = remote ? remotePlayers : localPlayers;
   const players = isLeavingRoom && myPlayerId ? playersRaw.filter((p) => p.id !== myPlayerId) : playersRaw;
+  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
 
   const goHome = useCallback(async () => {
     setJoinError(null);
@@ -733,7 +734,7 @@ export default function GameApp() {
                 </h2>
                 <ul className="scroll-touch flex max-h-[min(36dvh,260px)] flex-col gap-2 overflow-y-auto pr-0.5 sm:max-h-[min(42dvh,320px)] sm:gap-2.5">
                   <AnimatePresence>
-                    {players.map((p) => (
+                    {sortedPlayers.map((p) => (
                       <motion.li
                         key={p.id}
                         initial={{ opacity: 0, x: -12 }}
@@ -749,6 +750,11 @@ export default function GameApp() {
                           )}
                         </span>
                         <span className="min-w-0 flex-1 truncate font-bold text-slate-800 text-sm sm:text-base">{p.name}</span>
+                        {/* SCORE GLOBAL */}
+                        <div className="shrink-0 flex items-center justify-center gap-1 rounded-lg bg-amber-100 px-2 py-1 shadow-inner">
+                          <span className="text-xs font-black text-amber-700 sm:text-sm">{p.score || 0}</span>
+                          <span className="text-xs sm:text-sm">🏆</span>
+                        </div>
                         {p.id === myPlayerId && (
                           <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-600 sm:text-xs">
                             MOI

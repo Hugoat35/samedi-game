@@ -129,8 +129,9 @@ function getQuestionDifficulty(points: number): QuestionDifficulty {
 export function getRandomQuestionsByTheme(
   count: number, 
   activeThemes: QuestionTheme[],
-  difficulties: QuestionDifficulty[] = ["facile", "moyen", "difficile"]
-): QuizQuestion[] {
+  difficulties: QuestionDifficulty[] = ["facile", "moyen", "difficile"],
+  letterWeights: Record<string, number> = {} // <-- NOUVEAU : On récupère l'historique de la room
+): { questions: QuizQuestion[]; newWeights: Record<string, number> } {
   // 1. On récupère les questions des thèmes classiques
   let pool = QUIZ_BANK.filter((q) => activeThemes.includes(q.theme) && q.theme !== "Mini-Bac" && q.theme !== "Mathématiques");
   
@@ -149,13 +150,11 @@ export function getRandomQuestionsByTheme(
     const otherThemes = activeThemes.filter(t => t !== "Mini-Bac" && t !== "Mathématiques");
     
     if (otherThemes.length === 0) {
-      // CAS 1 : 100% Mathématiques ! On génère le nombre exact de questions demandées.
       selected = [];
       for (let i = 0; i < count; i++) {
         selected.push(generateMathQuestion());
       }
     } else {
-      // CAS 2 : Mode mixte. On remplace une partie des questions par des maths (environ 20% à 25%)
       const numMaths = Math.max(1, Math.floor(count / 4));
       for (let i = 0; i < numMaths; i++) {
         if (selected.length > 0) {
@@ -168,12 +167,37 @@ export function getRandomQuestionsByTheme(
     }
   }
 
-  // 3. Injection du Mini-Bac (comme avant)
+  // INITIALISATION DU SYSTÈME DE POIDS POUR LE MINI-BAC
+  const currentWeights = { ...letterWeights };
+  // Si une lettre n'a pas de poids, elle commence à 100
+  for (const char of MINI_BAC_LETTERS) {
+    if (currentWeights[char] === undefined) currentWeights[char] = 100;
+  }
+  const usedLettersThisRound: string[] = [];
+
+  // 3. Injection du Mini-Bac
   if (activeThemes.includes("Mini-Bac") && count >= 5 && selected.length >= 4) {
     const numMiniBacs = count >= 15 ? 2 : 1;
 
     for (let i = 0; i < numMiniBacs; i++) {
-      const randomLetter = MINI_BAC_LETTERS[randomIntBelow(MINI_BAC_LETTERS.length)]!;
+      
+      // TIRAGE AU SORT PONDÉRÉ : On additionne tous les points de chance
+      const totalWeight = Object.values(currentWeights).reduce((sum, w) => sum + w, 0);
+      let randomVal = Math.random() * totalWeight;
+      let randomLetter = MINI_BAC_LETTERS[0]!;
+      
+      for (const char of MINI_BAC_LETTERS) {
+        randomVal -= currentWeights[char];
+        if (randomVal <= 0) {
+          randomLetter = char;
+          break;
+        }
+      }
+
+      // La lettre vient de tomber : son poids s'effondre (quasi aucune chance de retomber de suite)
+      usedLettersThisRound.push(randomLetter);
+      currentWeights[randomLetter] = 20; 
+
       const shuffledCategories = shuffle([...MINI_BAC_CATEGORIES]).slice(0, 4);
 
       const miniBacQuestion: QuizQuestion = {
@@ -194,5 +218,13 @@ export function getRandomQuestionsByTheme(
     }
   }
 
-  return shuffle(selected);
+  // LES LETTRES NON UTILISÉES RÉCUPÈRENT DE L'ÉNERGIE (+30 points, max 100)
+  for (const char of MINI_BAC_LETTERS) {
+    if (!usedLettersThisRound.includes(char)) {
+      currentWeights[char] = Math.min(100, currentWeights[char] + 30);
+    }
+  }
+
+  // On retourne les questions ET la mémoire des probabilités
+  return { questions: shuffle(selected), newWeights: currentWeights };
 }
