@@ -428,6 +428,7 @@ export async function startWordleGameRemote(
   rounds: number,
   wordLenMin: number,
   wordLenMax: number,
+  timerSetting: number
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
@@ -437,6 +438,7 @@ export async function startWordleGameRemote(
     p_rounds: rounds,
     p_word_len_min: wordLenMin,
     p_word_len_max: wordLenMax,
+    p_timer: timerSetting
   });
 
   if (error) return { ok: false, error: error.message };

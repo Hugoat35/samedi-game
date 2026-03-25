@@ -102,6 +102,10 @@ function mapRpcError(raw: string | undefined, wordLen: number): string {
 export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, players }: WordleGameProps) {
   const gameState = roomState?.game_state as string | undefined;
   const gd = (roomState?.game_data || {}) as Record<string, unknown>;
+  const timerSetting = Number(gd.timer_setting || 130);
+  const isTimed = timerSetting <= 120;
+  const explosionTime = Number(gd.explosion_time || 0);
+  const [timeLeft, setTimeLeft] = useState(timerSetting);
   const scores = (gd.scores || {}) as Record<string, number>;
   const w = (gd.wordle || {}) as Record<string, unknown>;
   const guesses = (w.guesses || []) as Array<{
@@ -121,6 +125,7 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
   const wordLen = Math.min(10, Math.max(3, Number(w.word_length ?? 5)));
   const lenMin = Math.min(10, Math.max(3, Number(w.word_len_min ?? w.word_length ?? 5)));
   const lenMax = Math.min(10, Math.max(3, Number(w.word_len_max ?? w.word_length ?? 5)));
+  
 
   const currentTurnId = playerOrder[turnIndex] ?? null;
   const currentTurnPlayer = useMemo(
@@ -141,8 +146,30 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
 
   const keyHints = useMemo(() => bestKeyHints(guesses), [guesses]);
 
+  
   const draftWord = draft.trim().toUpperCase();
   const draftLooksFull = draftWord.length === wordLen && /^[A-Z]+$/.test(draftWord);
+
+  useEffect(() => {
+  if (status !== "playing" || !isTimed || explosionTime === 0) return;
+
+  let reqId: number;
+  const updateTimer = () => {
+    const remaining = Math.max(0, explosionTime - Date.now());
+    setTimeLeft(remaining / 1000);
+
+    if (remaining <= 0 && isHost && !busy) {
+      setBusy(true);
+      // Temps écoulé ! On soumet le mot spécial "PASSE_TOUR"
+      submitWordleGuessRemote(roomCode, currentTurnId, "PASSE_TOUR").finally(() => setBusy(false));
+    } else if (remaining > 0) {
+      reqId = requestAnimationFrame(updateTimer);
+    }
+  };
+
+  reqId = requestAnimationFrame(updateTimer);
+  return () => cancelAnimationFrame(reqId);
+}, [explosionTime, isHost, status, roomCode, currentTurnId, isTimed, busy]);
 
   useEffect(() => {
     const w = draft.trim().toUpperCase();
@@ -403,6 +430,26 @@ export default function WordleGame({ roomCode, roomState, myPlayerId, isHost, pl
           </p>
         )}
         {err && <p className="text-center text-xs font-semibold text-red-600">{err}</p>}
+
+        {/* CHRONOMÈTRE (Si activé) */}
+        {isTimed && status === "playing" && (
+          <div className="w-full max-w-[320px] mx-auto mt-4 px-2 mb-4">
+            <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+              <span>Temps restant</span>
+              <span className={timeLeft < 10 ? "text-rose-600 animate-pulse" : ""}>
+                {Math.ceil(timeLeft)}s
+              </span>
+            </div>
+            <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+              <motion.div 
+                className={`h-full ${timeLeft < 10 ? 'bg-rose-500' : 'bg-blue-500'}`}
+                initial={{ width: "100%" }}
+                animate={{ width: `${(timeLeft / timerSetting) * 100}%` }}
+                transition={{ ease: "linear", duration: 0.1 }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* CLAVIER ADAPTATIF */}
         <div className="mt-2 flex flex-col gap-1.5 sm:gap-2">

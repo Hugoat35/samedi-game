@@ -75,10 +75,12 @@ export default function GameApp() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(5);
   const [wordleRounds, setWordleRounds] = useState(5);
+  
   const WORDLE_LEN_LO = 3;
   const WORDLE_LEN_HI = 10;
   const [wordleLenMin, setWordleLenMin] = useState(5);
   const [wordleLenMax, setWordleLenMax] = useState(10);
+  const [wordleTimer, setWordleTimer] = useState(130); // 130 = Illimité
   const [bombLives, setBombLives] = useState(2);
   type BombTimer = "court" | "normal" | "long";
   const [bombTimer, setBombTimer] = useState<BombTimer>("normal");
@@ -414,7 +416,7 @@ export default function GameApp() {
       
       let result;
       if (selectedGame === "wordle-team") {
-        result = await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax);
+        result = await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax, wordleTimer);
       } else if (selectedGame === "bomb-game") {
         result = await startBombGameRemote(roomCode, players, bombLives, bombTimer, bombDifficulty);
       } else {
@@ -844,6 +846,26 @@ export default function GameApp() {
                                   {wordleLenMin}
                                 </span>
                               </div>
+
+                                 {/* NOUVEAU : TEMPS PAR JOUEUR */}
+                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 sm:px-4 mt-3">
+                                  <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                                    <span className="font-bold text-blue-800">Temps de réflexion</span>
+                                    <span className="font-mono text-lg font-bold text-blue-600 tabular-nums">
+                                      {wordleTimer > 120 ? "Illimité" : `${wordleTimer}s`}
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="10"
+                                    max="130"
+                                    step="10"
+                                    value={wordleTimer}
+                                    onChange={(e) => setWordleTimer(Number(e.target.value))}
+                                    className="mb-1 mt-2 w-full accent-blue-600"
+                                  />
+                                </div>
+
                               <div className="mb-2 flex items-center gap-2 sm:gap-3">
                                 <span className="w-9 shrink-0 text-[10px] font-bold text-slate-600 sm:w-10 sm:text-xs">
                                   Max
