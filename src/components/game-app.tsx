@@ -79,6 +79,11 @@ export default function GameApp() {
   const WORDLE_LEN_HI = 10;
   const [wordleLenMin, setWordleLenMin] = useState(5);
   const [wordleLenMax, setWordleLenMax] = useState(10);
+  const [bombLives, setBombLives] = useState(2);
+  type BombTimer = "court" | "normal" | "long";
+  const [bombTimer, setBombTimer] = useState<BombTimer>("normal");
+  type BombDifficulty = "facile" | "normal" | "difficile";
+  const [bombDifficulty, setBombDifficulty] = useState<BombDifficulty>("normal");
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(() => remote);
   const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
@@ -411,7 +416,7 @@ export default function GameApp() {
       if (selectedGame === "wordle-team") {
         result = await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax);
       } else if (selectedGame === "bomb-game") {
-        result = await startBombGameRemote(roomCode, players);
+        result = await startBombGameRemote(roomCode, players, bombLives, bombTimer, bombDifficulty);
       } else {
         result = await startGameRemote(roomCode, questionCount, activeThemes, activeDifficulties);
       }
@@ -892,9 +897,67 @@ export default function GameApp() {
                             />
                           </>
                           ) : selectedGame === "bomb-game" ? (
-                          <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-center">
-                            <p className="text-sm font-bold text-rose-800">Préparez-vous !</p>
-                            <p className="text-xs text-rose-600 mt-1">Trouvez les mots le plus vite possible avant que la bombe n'explose.</p>
+                          <div className="flex flex-col gap-3">
+                            <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
+                              Le célèbre jeu de la Patate Chaude ! Paramètre ta partie ci-dessous :
+                            </p>
+
+                            {/* VIES */}
+                            <div className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2.5 sm:px-4">
+                              <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                                <span className="font-bold text-rose-800">Vies par joueur</span>
+                                <span className="font-mono text-lg font-bold text-rose-600 tabular-nums">
+                                  {bombLives} ❤️
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                step="1"
+                                value={bombLives}
+                                onChange={(e) => setBombLives(Number(e.target.value))}
+                                className="mb-1 mt-2 w-full accent-rose-600"
+                              />
+                            </div>
+
+                            {/* MINUTEUR */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                              <span className="text-xs font-bold text-slate-700 sm:text-sm">Minuteur de la bombe</span>
+                              <div className="mt-2 flex gap-2">
+                                {(["court", "normal", "long"] as BombTimer[]).map((t) => (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setBombTimer(t)}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm outline-none sm:text-sm ${
+                                      bombTimer === t ? "bg-slate-800 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {t === "court" ? "10-20s" : t === "long" ? "30-45s" : "15-30s"}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* DIFFICULTÉ */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3">
+                              <span className="text-xs font-bold text-slate-700 sm:text-sm">Syllabes</span>
+                              <div className="mt-2 flex gap-2">
+                                {(["facile", "normal", "difficile"] as BombDifficulty[]).map((d) => (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setBombDifficulty(d)}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm outline-none sm:text-sm ${
+                                      bombDifficulty === d ? "bg-rose-500 border-rose-600 text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                           
                         ) : (

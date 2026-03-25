@@ -41,17 +41,34 @@ function randomChoice<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function generateBombConstraint(): BombConstraint {
+export type BombDifficulty = "facile" | "normal" | "difficile";
+
+export function generateBombConstraint(difficulty: BombDifficulty = "normal"): BombConstraint {
   const typeRand = Math.random();
   
+  // On filtre selon la difficulté choisie
+  let prefixPool = PREFIXES;
+  let suffixPool = SUFFIXES;
+  let infixPool = INFIXES;
+
+  if (difficulty === "facile") {
+    prefixPool = PREFIXES.filter(w => w.length <= 2);
+    suffixPool = SUFFIXES.filter(w => w.length <= 2);
+    infixPool = INFIXES.filter(w => w.length <= 2);
+  } else if (difficulty === "difficile") {
+    prefixPool = PREFIXES.filter(w => w.length >= 3);
+    suffixPool = SUFFIXES.filter(w => w.length >= 3);
+    infixPool = INFIXES.filter(w => w.length >= 3);
+  }
+
   if (typeRand < 0.33) {
-    const val = randomChoice(PREFIXES);
+    const val = randomChoice(prefixPool);
     return { type: "starts_with", value: val, label: `Commence par "${val}"` };
   } else if (typeRand < 0.66) {
-    const val = randomChoice(SUFFIXES);
+    const val = randomChoice(suffixPool);
     return { type: "ends_with", value: val, label: `Finit par "${val}"` };
   } else {
-    const val = randomChoice(INFIXES);
+    const val = randomChoice(infixPool);
     return { type: "contains", value: val, label: `Contient "${val}"` };
   }
 }

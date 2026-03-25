@@ -715,27 +715,31 @@ export async function returnToLobbyRemote(roomCode: string) {
 // MODE "BOMB" (Patate Chaude)
 // ============================================================================
 
+function getBombTimerSeconds(setting: string): number {
+  if (setting === "court") return Math.floor(Math.random() * 11) + 10; // 10 à 20s
+  if (setting === "long") return Math.floor(Math.random() * 16) + 30;  // 30 à 45s
+  return Math.floor(Math.random() * 16) + 15; // normal : 15 à 30s
+}
+
 export async function startBombGameRemote(
   roomCode: string,
-  players: Player[]
+  players: Player[],
+  livesCount: number,
+  timerSetting: string,
+  difficulty: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  // Initialisation : on mélange les joueurs pour l'ordre de passage
   const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
   const playerOrder = shuffledPlayers.map((p) => p.id);
   
-  // Tout le monde commence avec 2 vies
   const lives: Record<string, number> = {};
-  playerOrder.forEach((id) => (lives[id] = 2));
+  playerOrder.forEach((id) => (lives[id] = livesCount));
 
-  // Première consigne
-  const initialConstraint = generateBombConstraint();
+  const initialConstraint = generateBombConstraint(difficulty as any);
   
-  // Timer aléatoire entre 15 et 30 secondes pour la première bombe
-  const timerSeconds = Math.floor(Math.random() * 16) + 15; 
-  // On stocke le timestamp de fin (en ms)
+  const timerSeconds = getBombTimerSeconds(timerSetting); 
   const explosionTime = Date.now() + (timerSeconds * 1000);
 
   const { error } = await supabase
@@ -744,12 +748,13 @@ export async function startBombGameRemote(
       game_state: "playing",
       game_data: {
         game_kind: "bomb",
+        bomb_settings: { timer: timerSetting, difficulty }, // On sauvegarde les réglages !
         player_order: playerOrder,
         turn_index: 0,
         lives: lives,
         current_constraint: initialConstraint,
         explosion_time: explosionTime,
-        used_words: [] as string[], // Pour empêcher de répéter les mots
+        used_words: [],
         status: "playing",
         round_number: 1,
       },
@@ -808,7 +813,8 @@ export async function submitBombGuessRemote(
     attempts++;
   }
 
-  const newConstraint = generateBombConstraint();
+  const difficulty = currentData.bomb_settings?.difficulty || "normal";
+  const newConstraint = generateBombConstraint(difficulty);
   
   // CALCUL DU SURSIS (6 SECONDES)
   const timeLeftMs = currentData.explosion_time - Date.now();
@@ -882,8 +888,11 @@ export async function handleBombExplosionRemote(
     }
   }
 
-  const newConstraint = generateBombConstraint();
-  const timerSeconds = Math.floor(Math.random() * 16) + 15; // Reset entre 15 et 30s
+  const difficulty = currentData.bomb_settings?.difficulty || "normal";
+  const timerSetting = currentData.bomb_settings?.timer || "normal";
+
+  const newConstraint = generateBombConstraint(difficulty);
+  const timerSeconds = getBombTimerSeconds(timerSetting);
   const newExplosionTime = Date.now() + (timerSeconds * 1000);
 
   const { error } = await supabase
