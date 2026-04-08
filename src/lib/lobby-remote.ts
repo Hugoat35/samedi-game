@@ -1044,21 +1044,59 @@ const WIKI_TARGET_PAGES = [
 ];
 
 export async function startWikiRaceRemote(
-  roomCode: string
+  roomCode: string,
+  settings?: {
+    backjumps: number;
+    searches: number;
+    customStart?: string;
+    customTarget?: string;
+  }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseBrowser();
   if (!supabase) return { ok: false, error: "Supabase non configuré." };
 
-  // 1. On tire au sort une page de départ et une page d'arrivée
-  const startPage = WIKI_START_PAGES[Math.floor(Math.random() * WIKI_START_PAGES.length)];
-  let targetPage = WIKI_TARGET_PAGES[Math.floor(Math.random() * WIKI_TARGET_PAGES.length)];
+  let startPage = "Pomme";
+  let targetPage = "Vaisseau_spatial";
   
-  // Petite sécurité au cas où ce serait la même page
-  while (startPage === targetPage) {
-    targetPage = WIKI_TARGET_PAGES[Math.floor(Math.random() * WIKI_TARGET_PAGES.length)];
+  // On récupère tes paramètres ou on met les valeurs par défaut
+  const backjumps = settings?.backjumps ?? 3;
+  const searches = settings?.searches ?? 2;
+
+  // Si l'hôte a choisi des mots personnalisés, on les utilise directement !
+  if (settings?.customStart && settings?.customTarget) {
+    startPage = settings.customStart.replace(/ /g, "_");
+    targetPage = settings.customTarget.replace(/ /g, "_");
+  } else {
+    // Sinon, on fait le tirage aléatoire comme avant
+    try {
+      const res = await fetch("https://fr.wikipedia.org/w/api.php?action=query&generator=random&grnnamespace=0&grnlimit=10&prop=extracts&exchars=200&exintro=1&format=json&origin=*");
+      const data = await res.json();
+      
+      if (data?.query?.pages) {
+        const pages = Object.values(data.query.pages) as Array<{ title: string, extract?: string }>;
+        const goodPages = pages.filter(p => {
+          if (!p.extract) return false;
+          if (p.extract.length < 80) return false;
+          if (/^\d{1,2}\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)$/i.test(p.title)) return false;
+          if (/^\d{4}$/.test(p.title)) return false;
+          return true;
+        });
+
+        if (goodPages.length >= 2) {
+          startPage = goodPages[0].title.replace(/ /g, "_");
+          targetPage = goodPages[1].title.replace(/ /g, "_");
+        } else {
+          const randomFallback = Object.values(data.query.pages) as Array<{ title: string }>;
+          startPage = randomFallback[0].title.replace(/ /g, "_");
+          targetPage = randomFallback[1].title.replace(/ /g, "_");
+        }
+      }
+    } catch (err) {
+      console.error("Erreur lors de la génération aléatoire :", err);
+    }
   }
 
-  // 2. On met à jour la Room pour dire que le jeu commence
+  // 2. On met à jour la Room en sauvegardant tes Jokers
   const { error } = await supabase
     .from("rooms")
     .update({
@@ -1067,7 +1105,9 @@ export async function startWikiRaceRemote(
         game_kind: "wikirace",
         start_page: startPage,
         target_page: targetPage,
-        winners: [], // On gardera la trace de ceux qui ont fini
+        backjumps: backjumps, // <-- On sauvegarde le nombre de Jokers Retour
+        searches: searches,   // <-- On sauvegarde le nombre de Jokers Chercher
+        winners: [],
         status: "playing",
       },
     })

@@ -90,6 +90,26 @@ export default function GameApp() {
   const [bombTimer, setBombTimer] = useState<BombTimer>("normal");
   type BombDifficulty = "facile" | "normal" | "difficile";
   const [bombDifficulty, setBombDifficulty] = useState<BombDifficulty>("normal");
+  
+  // --- NOUVEAU : PARAMÈTRES WIKIRACE ---
+  const [wikiBackjumps, setWikiBackjumps] = useState(3);
+  const [wikiSearches, setWikiSearches] = useState(2);
+  const [wikiMode, setWikiMode] = useState<"random" | "custom">("random");
+  const [wikiStartSearch, setWikiStartSearch] = useState("");
+  const [wikiTargetSearch, setWikiTargetSearch] = useState("");
+  const [wikiSuggestions, setWikiSuggestions] = useState<string[]>([]);
+
+  // Fonction de recherche Wikipedia en direct
+  const searchWikiPages = async (query: string) => {
+    if (query.length < 3) return;
+    try {
+      const res = await fetch(`https://fr.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&format=json&origin=*`);
+      const data = await res.json();
+      setWikiSuggestions(data[1] || []); // data[1] contient les titres suggérés par Wikipedia
+    } catch (err) {}
+  };
+  // -------------------------------------
+
   const [startError, setStartError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(() => remote);
   const [reconnectOffer, setReconnectOffer] = useState<StoredSession | null>(null);
@@ -425,7 +445,12 @@ export default function GameApp() {
       } else if (selectedGame === "bomb-game") {
         result = await startBombGameRemote(roomCode, players, bombLives, bombTimer, bombDifficulty);
       } else if (selectedGame === "wikirace") {
-        result = await startWikiRaceRemote(roomCode);
+        result = await startWikiRaceRemote(roomCode, {
+          backjumps: wikiBackjumps,
+          searches: wikiSearches,
+          customStart: wikiMode === "custom" && wikiStartSearch.trim() !== "" ? wikiStartSearch : undefined,
+          customTarget: wikiMode === "custom" && wikiTargetSearch.trim() !== "" ? wikiTargetSearch : undefined,
+        });
       } else {
         result = await startGameRemote(roomCode, questionCount, activeThemes, activeDifficulties);
       }
@@ -1008,9 +1033,57 @@ export default function GameApp() {
                           
                         ) : selectedGame === "wikirace" ? (
                           <div className="flex flex-col gap-3">
-                             <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
-                              Naviguez de page en page sur Wikipedia en utilisant uniquement les liens ! Le premier arrivé à la page cible gagne.
+                            <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
+                              Naviguez de page en page sur Wikipedia en utilisant uniquement les liens !
                             </p>
+
+                            {/* CHOIX DES JOKERS */}
+                            <div className="flex gap-2 sm:gap-3">
+                              <div className="flex-1 rounded-xl border border-amber-200 bg-amber-50/50 p-2 sm:p-3 shadow-sm">
+                                <span className="text-[10px] font-bold text-amber-800 sm:text-xs">⏪ Retours Arrière</span>
+                                <input type="number" min="0" max="15" value={wikiBackjumps} onChange={(e) => setWikiBackjumps(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2 py-1 text-sm font-bold text-amber-900 outline-none focus:ring-2 focus:ring-amber-500" />
+                              </div>
+                              <div className="flex-1 rounded-xl border border-emerald-200 bg-emerald-50/50 p-2 sm:p-3 shadow-sm">
+                                <span className="text-[10px] font-bold text-emerald-800 sm:text-xs">🔍 Recherches</span>
+                                <input type="number" min="0" max="15" value={wikiSearches} onChange={(e) => setWikiSearches(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-sm font-bold text-emerald-900 outline-none focus:ring-2 focus:ring-emerald-500" />
+                              </div>
+                            </div>
+
+                            {/* PAGES DE DÉPART ET D'ARRIVÉE */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 sm:p-3 shadow-sm">
+                              <span className="text-[10px] font-bold text-slate-700 sm:text-xs">Mode de jeu</span>
+                              <div className="mt-2 flex gap-2">
+                                <button type="button" onClick={() => setWikiMode("random")} className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all border ${wikiMode === "random" ? "bg-blue-500 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-500"}`}>Aléatoire</button>
+                                <button type="button" onClick={() => setWikiMode("custom")} className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all border ${wikiMode === "custom" ? "bg-blue-500 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-500"}`}>Sur Mesure</button>
+                              </div>
+                              
+                              {wikiMode === "custom" && (
+                                <div className="mt-3 flex flex-col gap-2 border-t border-slate-200/50 pt-3">
+                                  <input 
+                                    type="text" 
+                                    placeholder="Page de Départ (ex: Pomme)" 
+                                    value={wikiStartSearch} 
+                                    list="wiki-suggestions"
+                                    onChange={(e) => { setWikiStartSearch(e.target.value); searchWikiPages(e.target.value); }} 
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
+                                  />
+                                  <input 
+                                    type="text" 
+                                    placeholder="Page d'Arrivée (ex: Vaisseau_spatial)" 
+                                    value={wikiTargetSearch} 
+                                    list="wiki-suggestions"
+                                    onChange={(e) => { setWikiTargetSearch(e.target.value); searchWikiPages(e.target.value); }} 
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" 
+                                  />
+                                  <datalist id="wiki-suggestions">
+                                    {wikiSuggestions.map(suggestion => (
+                                      <option key={suggestion} value={suggestion} />
+                                    ))}
+                                  </datalist>
+                                  <p className="text-[10px] text-slate-400">Choisis une page dans la liste déroulante pour être sûr qu'elle existe.</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                               <div className="flex flex-col gap-2">
