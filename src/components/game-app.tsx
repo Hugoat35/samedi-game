@@ -1130,7 +1130,12 @@ export default function GameApp() {
 
           {/* C'EST ICI QU'ON APPELLE TON NOUVEAU COMPOSANT DE JEU */}
           {view === "playing" && roomState && roomCode && myPlayerId && (
-            <motion.section key="playing" className="flex min-h-0 flex-1 flex-col gap-2" {...pageTransition}>
+            <motion.section key="playing" className="flex min-h-0 flex-1 flex-col gap-2 relative" {...pageTransition}>
+              {/* On sort le bouton Emoji du flux pour qu'il ne scrolle plus */}
+              <div className="absolute inset-0 z-50 pointer-events-none">
+                <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
+              </div>
+
               {playerDepartedNotice && (
                 <div
                   role="status"
@@ -1139,7 +1144,6 @@ export default function GameApp() {
                   {playerDepartedNotice}
                 </div>
               )}
-              <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
               {(roomState?.game_data as any)?.game_kind === "bomb" ? (
                 <BombGame
                   roomCode={roomCode}

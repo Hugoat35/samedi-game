@@ -1077,7 +1077,10 @@ export async function startWikiRaceRemote(
   return { ok: true };
 }
 
-// Fonction pour déclarer qu'un joueur a gagné !
+// ============================================================================
+// WIKIRACE - VICTOIRE
+// ============================================================================
+
 export async function submitWikiRaceWinRemote(
   roomCode: string,
   playerId: string,
@@ -1089,19 +1092,27 @@ export async function submitWikiRaceWinRemote(
 
   const currentWinners = currentData.winners || [];
   
-  // Si le joueur a déjà gagné, on ne fait rien
-  if (currentWinners.some((w: any) => w.id === playerId)) return { ok: true };
+  // Si quelqu'un a déjà gagné ou si c'est moi, on ne fait rien pour éviter le spam
+  if (currentWinners.length > 0) return { ok: true };
 
-  const newWinners = [...currentWinners, { id: playerId, history }];
+  // On crée le gagnant avec son historique et on lui donne 100 points
+  const newWinners = [{ id: playerId, history }];
+  
+  const scoresToAdd: Record<string, number> = {};
+  scoresToAdd[playerId] = 100;
 
+  // On ajoute les points au classement global
+  await supabase.rpc("add_global_scores", { p_code: roomCode.trim(), p_scores: scoresToAdd });
+
+  // On coupe le jeu pour tout le monde en repassant la salle en mode "lobby"
   const { error } = await supabase
     .from("rooms")
     .update({
+      game_state: "lobby", // <-- LA MAGIE EST ICI : Le jeu s'arrête sur tous les téléphones !
       game_data: {
         ...currentData,
         winners: newWinners,
-        // Si on veut arrêter le jeu dès qu'un joueur trouve, on pourrait changer le status ici.
-        // Pour l'instant on laisse les autres chercher !
+        status: "finished",
       },
     })
     .eq("code", roomCode.trim());
@@ -1109,3 +1120,4 @@ export async function submitWikiRaceWinRemote(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
