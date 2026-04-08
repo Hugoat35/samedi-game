@@ -18,9 +18,13 @@ export default function WikiRace({ roomState, isHost, players, startPage, target
   const [history, setHistory] = useState<string[]>([startPage]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // --- JOKERS STATES ---
-  const [backjumpsLeft, setBackjumpsLeft] = useState(3);
-  const [searchLeft, setSearchLeft] = useState(2);
+  // --- JOKERS STATES (Liés aux paramètres du Lobby) ---
+  const initialBackjumps = roomState?.game_data?.backjumps ?? 3;
+  const initialSearches = roomState?.game_data?.searches ?? 2;
+
+  const [backjumpsLeft, setBackjumpsLeft] = useState<number>(initialBackjumps);
+  const [searchLeft, setSearchLeft] = useState<number>(initialSearches);
+  
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 

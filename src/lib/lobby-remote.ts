@@ -1139,7 +1139,7 @@ export async function submitWikiRaceWinRemote(
   const newWinners = [{ id: playerId, history }];
   
   const scoresToAdd: Record<string, number> = {};
-  scoresToAdd[playerId] = 100;
+  scoresToAdd[playerId] = 500;
 
   // On ajoute les points au classement global
   await supabase.rpc("add_global_scores", { p_code: roomCode.trim(), p_scores: scoresToAdd });
