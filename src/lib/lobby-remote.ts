@@ -1031,3 +1031,81 @@ export async function skipOfflinePlayerRemote(
 
   return { ok: true };
 }
+
+// ============================================================================
+// MODE "WIKIRACE"
+// ============================================================================
+
+const WIKI_START_PAGES = [
+  "Pomme", "Tour_Eiffel", "Zinédine_Zidane", "Harry_Potter", "Chien", "Baguette_de_pain"
+];
+const WIKI_TARGET_PAGES = [
+  "Vaisseau_spatial", "Pape_François", "Plutonium", "Dinosaure", "Révolution_française", "Trou_noir"
+];
+
+export async function startWikiRaceRemote(
+  roomCode: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  // 1. On tire au sort une page de départ et une page d'arrivée
+  const startPage = WIKI_START_PAGES[Math.floor(Math.random() * WIKI_START_PAGES.length)];
+  let targetPage = WIKI_TARGET_PAGES[Math.floor(Math.random() * WIKI_TARGET_PAGES.length)];
+  
+  // Petite sécurité au cas où ce serait la même page
+  while (startPage === targetPage) {
+    targetPage = WIKI_TARGET_PAGES[Math.floor(Math.random() * WIKI_TARGET_PAGES.length)];
+  }
+
+  // 2. On met à jour la Room pour dire que le jeu commence
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_state: "playing",
+      game_data: {
+        game_kind: "wikirace",
+        start_page: startPage,
+        target_page: targetPage,
+        winners: [], // On gardera la trace de ceux qui ont fini
+        status: "playing",
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Fonction pour déclarer qu'un joueur a gagné !
+export async function submitWikiRaceWinRemote(
+  roomCode: string,
+  playerId: string,
+  currentData: any,
+  history: string[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowser();
+  if (!supabase) return { ok: false, error: "Supabase non configuré." };
+
+  const currentWinners = currentData.winners || [];
+  
+  // Si le joueur a déjà gagné, on ne fait rien
+  if (currentWinners.some((w: any) => w.id === playerId)) return { ok: true };
+
+  const newWinners = [...currentWinners, { id: playerId, history }];
+
+  const { error } = await supabase
+    .from("rooms")
+    .update({
+      game_data: {
+        ...currentData,
+        winners: newWinners,
+        // Si on veut arrêter le jeu dès qu'un joueur trouve, on pourrait changer le status ici.
+        // Pour l'instant on laisse les autres chercher !
+      },
+    })
+    .eq("code", roomCode.trim());
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

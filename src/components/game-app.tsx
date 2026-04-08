@@ -16,6 +16,8 @@ import {
   startGameRemote,
   startWordleGameRemote,
   startBombGameRemote,
+  startWikiRaceRemote,
+  submitWikiRaceWinRemote,
 
 } from "@/lib/lobby-remote";
 import type { Player } from "@/lib/lobby-types";
@@ -36,12 +38,14 @@ import QuizGame from "@/components/quiz-game";
 import WordleGame from "@/components/wordle-game";
 import FloatingReactions from "@/components/floating-reactions";
 import BombGame from "./bomb-game";
+import WikiRace from "./wiki-race";
 
 type View = "home" | "join" | "create" | "lobby" | "playing";
 
 function selectedGameFromRoom(room: Record<string, unknown>): string {
   const gk = (room.game_data as { game_kind?: string } | undefined)?.game_kind;
   if (gk === "bomb") return "bomb-game";
+  if (gk === "wikirace") return "wikirace";
   return gk === "wordle" ? "wordle-team" : "culture-quiz";
 }
 
@@ -420,6 +424,8 @@ export default function GameApp() {
         result = await startWordleGameRemote(roomCode, wordleRounds, wordleLenMin, wordleLenMax, wordleTimer);
       } else if (selectedGame === "bomb-game") {
         result = await startBombGameRemote(roomCode, players, bombLives, bombTimer, bombDifficulty);
+      } else if (selectedGame === "wikirace") {
+        result = await startWikiRaceRemote(roomCode);
       } else {
         result = await startGameRemote(roomCode, questionCount, activeThemes, activeDifficulties);
       }
@@ -804,12 +810,23 @@ export default function GameApp() {
                             <span className="shrink-0 text-xs font-bold text-rose-600 sm:text-sm">→</span>
                           </div>
                         </button>
+                        <button
+                          onClick={() => setSelectedGame("wikirace")}
+                          className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 p-[1.5px] shadow-sm transition hover:brightness-[1.02] sm:rounded-2xl sm:p-[2px]"
+                        >
+                          <div className="flex w-full items-center justify-between gap-2 rounded-[11px] bg-white px-3 py-3 sm:rounded-[14px] sm:px-5 sm:py-3.5">
+                            <span className="min-w-0 truncate text-left text-sm font-bold text-slate-800 sm:text-base">
+                              🌍 WikiRace
+                            </span>
+                            <span className="shrink-0 text-xs font-bold text-blue-600 sm:text-sm">→</span>
+                          </div>
+                        </button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3 sm:gap-4">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base">
-                            {selectedGame === "wordle-team" ? "🔤 Wordle à plusieurs" : selectedGame === "bomb-game" ? "💣 La Bombe" : "🧠 Culture Quiz"}
+                            {selectedGame === "wordle-team" ? "🔤 Wordle à plusieurs" : selectedGame === "bomb-game" ? "💣 La Bombe" : selectedGame === "wikirace" ? "🌍 WikiRace" : "🧠 Culture Quiz"}
                           </h3>
                           <button
                             type="button"
@@ -989,6 +1006,12 @@ export default function GameApp() {
                             </div>
                           </div>
                           
+                        ) : selectedGame === "wikirace" ? (
+                          <div className="flex flex-col gap-3">
+                             <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
+                              Naviguez de page en page sur Wikipedia en utilisant uniquement les liens ! Le premier arrivé à la page cible gagne.
+                            </p>
+                          </div>
                         ) : (
                               <div className="flex flex-col gap-2">
                           {/* JAUGE DE QUESTIONS */}
@@ -1132,6 +1155,14 @@ export default function GameApp() {
                   myPlayerId={myPlayerId}
                   isHost={isHost}
                   players={players}
+                />
+              ) : (roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wikirace" ? (
+                <WikiRace
+                  startPage={(roomState?.game_data as any)?.start_page as string}
+                  targetPage={(roomState?.game_data as any)?.target_page as string}
+                  onWin={async (history) => {
+                    await submitWikiRaceWinRemote(roomCode, myPlayerId, roomState?.game_data, history);
+                  }}
                 />
               ) : (
                 <QuizGame
