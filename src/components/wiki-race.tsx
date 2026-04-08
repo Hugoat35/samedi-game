@@ -3,12 +3,16 @@
 import { useEffect, useState, useRef } from "react";
 
 interface WikiRaceProps {
+  roomState?: any;
+  isHost?: boolean;
+  players?: any[];
   startPage: string;
   targetPage: string;
   onWin: (history: string[]) => void;
+  onReturnToLobby?: () => void;
 }
 
-export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps) {
+export default function WikiRace({ roomState, isHost, players, startPage, targetPage, onWin, onReturnToLobby }: WikiRaceProps) {
   const [currentPage, setCurrentPage] = useState(startPage);
   const [htmlContent, setHtmlContent] = useState<string>("<p>Chargement...</p>");
   const [history, setHistory] = useState<string[]>([startPage]);
@@ -38,7 +42,6 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
 
         if (data?.parse?.text) {
           setHtmlContent(data.parse.text["*"]);
-          // On remonte la page tout en haut au chargement d'un nouvel article
           if (contentRef.current) {
             contentRef.current.parentElement?.scrollTo(0, 0);
           }
@@ -102,8 +105,66 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
     if (!searchQuery) return;
     const found = (window as any).find(searchQuery, false, false, true, false, true, false);
     if (!found) alert("Mot introuvable plus bas dans la page !");
+    
+    // FIX : On referme la barre pour consommer le Joker définitivement !
+    setIsSearchOpen(false);
+    setSearchQuery("");
   };
 
+  // --- ÉCRAN DE FIN (PODIUM) ---
+  const gameData = roomState?.game_data || {};
+  const isFinished = gameData.status === "finished";
+  const winners = gameData.winners || [];
+
+  if (isFinished && winners.length > 0) {
+    const winnerId = winners[0].id;
+    const winnerHistory = winners[0].history;
+    const winnerName = players?.find(p => p.id === winnerId)?.name || "Un joueur";
+
+    return (
+      <div className="flex h-[calc(100vh-6rem)] sm:h-full flex-col items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 pointer-events-auto p-4 sm:p-8 text-center relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-white pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col items-center w-full max-w-md">
+          <div className="text-6xl sm:text-7xl mb-4 sm:mb-6 animate-bounce">🏆</div>
+          <h2 className="text-2xl sm:text-3xl font-black text-blue-900 mb-2">{winnerName} a gagné !</h2>
+          <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8">
+            Il a atteint <strong>{targetPage.replace(/_/g, " ")}</strong> en {winnerHistory.length - 1} clics.
+          </p>
+
+          <div className="bg-white p-4 rounded-xl shadow-md border border-slate-100 w-full mb-6 sm:mb-8 text-left max-h-[40vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 mb-3 text-xs sm:text-sm uppercase tracking-wide">Son parcours détaillé :</h3>
+            <div className="flex flex-col gap-2">
+              {winnerHistory.map((page: string, i: number) => (
+                <div key={i} className="text-xs sm:text-sm text-slate-600 flex items-start gap-2">
+                  <span className="text-blue-500 font-bold shrink-0">
+                    {i === 0 ? "🏁" : i === winnerHistory.length - 1 ? "🏆" : "↓"}
+                  </span> 
+                  <span className={i === winnerHistory.length - 1 ? "font-bold text-slate-900" : ""}>
+                    {page.replace(/_/g, " ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {isHost && onReturnToLobby && (
+            <button 
+              onClick={onReturnToLobby} 
+              className="w-full bg-blue-600 text-white font-bold py-3.5 sm:py-4 px-8 rounded-2xl shadow-lg hover:bg-blue-700 transition transform hover:scale-[1.02] active:scale-95 text-sm sm:text-base"
+            >
+              Retour au salon
+            </button>
+          )}
+          {!isHost && (
+            <p className="text-xs sm:text-sm text-slate-500 animate-pulse font-medium">En attente de l'hôte pour retourner au salon...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- INTERFACE NORMALE DU JEU ---
   return (
     <div className="flex h-[calc(100vh-6rem)] sm:h-full flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 pointer-events-auto">
       {/* HEADER ULTRA COMPACT POUR MOBILE */}

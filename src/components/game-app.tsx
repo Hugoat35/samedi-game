@@ -1131,11 +1131,6 @@ export default function GameApp() {
           {/* C'EST ICI QU'ON APPELLE TON NOUVEAU COMPOSANT DE JEU */}
           {view === "playing" && roomState && roomCode && myPlayerId && (
             <motion.section key="playing" className="flex min-h-0 flex-1 flex-col gap-2 relative" {...pageTransition}>
-              {/* On sort le bouton Emoji du flux pour qu'il ne scrolle plus */}
-              <div className="absolute inset-0 z-50 pointer-events-none">
-                <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
-              </div>
-
               {playerDepartedNotice && (
                 <div
                   role="status"
@@ -1163,10 +1158,16 @@ export default function GameApp() {
               ) : (roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wikirace" ? (
                 (roomState?.game_data as any)?.start_page ? (
                   <WikiRace
+                    roomState={roomState}
+                    isHost={isHost}
+                    players={players}
                     startPage={(roomState?.game_data as any)?.start_page as string}
                     targetPage={(roomState?.game_data as any)?.target_page as string}
                     onWin={async (history) => {
                       await submitWikiRaceWinRemote(roomCode, myPlayerId, roomState?.game_data, history);
+                    }}
+                    onReturnToLobby={async () => {
+                      await returnToLobbyRemote(roomCode);
                     }}
                   />
                 ) : (
@@ -1189,6 +1190,11 @@ export default function GameApp() {
 
         </AnimatePresence>
       </main>
+
+      {/* EMOJIS SORTIS DU FLUX DE SCROLL (Ils flotteront vraiment) */}
+      {view === "playing" && roomState && roomCode && myPlayerId && (
+        <FloatingReactions roomCode={roomCode} myPlayerId={myPlayerId} players={players} />
+      )}
 
       {/* FENÊTRE DE CONFIRMATION (MODAL) 👇 */}
       <AnimatePresence>

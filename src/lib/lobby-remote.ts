@@ -1104,11 +1104,11 @@ export async function submitWikiRaceWinRemote(
   // On ajoute les points au classement global
   await supabase.rpc("add_global_scores", { p_code: roomCode.trim(), p_scores: scoresToAdd });
 
-  // On coupe le jeu pour tout le monde en repassant la salle en mode "lobby"
+  // On met le jeu en mode terminé pour afficher l'écran de victoire !
   const { error } = await supabase
     .from("rooms")
     .update({
-      game_state: "lobby", // <-- LA MAGIE EST ICI : Le jeu s'arrête sur tous les téléphones !
+      game_state: "finished", // <-- Changé de "lobby" à "finished"
       game_data: {
         ...currentData,
         winners: newWinners,
