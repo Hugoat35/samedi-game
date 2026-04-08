@@ -13,10 +13,21 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
   const [htmlContent, setHtmlContent] = useState<string>("<p>Chargement...</p>");
   const [history, setHistory] = useState<string[]>([startPage]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // --- JOKERS STATES ---
+  const [backjumpsLeft, setBackjumpsLeft] = useState(3);
+  const [searchLeft, setSearchLeft] = useState(2);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Appel à l'API publique de Wikipedia
   useEffect(() => {
+    // On ferme la barre de recherche à chaque changement de page
+    setIsSearchOpen(false);
+    setSearchQuery("");
+
     async function fetchWikiPage() {
       setIsLoading(true);
       try {
@@ -75,6 +86,32 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
     }
   };
 
+  // --- FONCTIONS DES JOKERS ---
+  const handleBackjump = () => {
+    if (backjumpsLeft > 0 && history.length > 1) {
+      const newHistory = [...history];
+      newHistory.pop(); // Retire la page actuelle
+      const previousPage = newHistory[newHistory.length - 1];
+      setHistory(newHistory);
+      setCurrentPage(previousPage);
+      setBackjumpsLeft((prev) => prev - 1);
+    }
+  };
+
+  const handleActivateSearch = () => {
+    if (searchLeft > 0 && !isSearchOpen) {
+      setSearchLeft((prev) => prev - 1);
+      setIsSearchOpen(true);
+    }
+  };
+
+  const executeSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    // Utilise la fonction de recherche native du navigateur (saute au mot !)
+    const found = (window as any).find(searchQuery, false, false, true, false, true, false);    if (!found) alert("Mot introuvable plus bas dans la page !");
+  };
+
   return (
     <div className="flex h-full flex-col bg-slate-50">
       {/* HEADER DU JEU */}
@@ -93,6 +130,41 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
             Chemin : {history.map(h => h.replace(/_/g, " ")).join(" > ")}
           </span>
         </div>
+
+        {/* BARRE DES JOKERS */}
+        <div className="mt-2 flex gap-2 border-t border-slate-100 pt-2">
+          <button
+            onClick={handleBackjump}
+            disabled={backjumpsLeft === 0 || history.length <= 1 || isLoading}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-100 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-200 disabled:opacity-40"
+          >
+            <span>⏪</span> Retour ({backjumpsLeft})
+          </button>
+          
+          <button
+            onClick={handleActivateSearch}
+            disabled={searchLeft === 0 || isSearchOpen || isLoading}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-100 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-200 disabled:opacity-40"
+          >
+            <span>🔍</span> Chercher ({searchLeft})
+          </button>
+        </div>
+
+        {/* BARRE DE RECHERCHE (Visible que si Joker activé) */}
+        {isSearchOpen && (
+          <form onSubmit={executeSearch} className="mt-2 flex gap-2">
+            <input
+              type="text"
+              placeholder="Mot à trouver..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            />
+            <button type="submit" className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">
+              Sauter au mot
+            </button>
+          </form>
+        )}
       </div>
 
       {/* LECTEUR WIKIPEDIA */}
