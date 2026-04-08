@@ -107,7 +107,20 @@ export default function WikiRace({ startPage, targetPage, onWin }: WikiRaceProps
         <div 
           ref={contentRef}
           onClick={handleContentClick}
-          className="prose prose-sm max-w-none sm:prose-base prose-a:text-blue-600 hover:prose-a:text-blue-800"
+          className="
+            text-sm sm:text-base text-slate-800
+            [&_a]:text-blue-600 [&_a]:underline [&_a]:font-medium hover:[&_a]:text-blue-800 
+            [&_p]:mb-4 [&_p]:leading-relaxed 
+            [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-8
+            [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:border-b [&_h2]:border-slate-200 [&_h2]:pb-1
+            [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-6
+            [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_li]:mb-1
+            [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4
+            [&_.mw-editsection]:hidden
+            [&_.reference]:hidden
+            [&_.navbox]:hidden
+            [&_.infobox]:float-right [&_.infobox]:ml-4 [&_.infobox]:mb-4 [&_.infobox]:bg-slate-100 [&_.infobox]:p-2 [&_.infobox]:text-xs [&_.infobox]:rounded-lg
+          "
           dangerouslySetInnerHTML={{ __html: htmlContent }} 
         />
       </div>
