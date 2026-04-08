@@ -1157,13 +1157,20 @@ export default function GameApp() {
                   players={players}
                 />
               ) : (roomState?.game_data as { game_kind?: string } | undefined)?.game_kind === "wikirace" ? (
-                <WikiRace
-                  startPage={(roomState?.game_data as any)?.start_page as string}
-                  targetPage={(roomState?.game_data as any)?.target_page as string}
-                  onWin={async (history) => {
-                    await submitWikiRaceWinRemote(roomCode, myPlayerId, roomState?.game_data, history);
-                  }}
-                />
+                (roomState?.game_data as any)?.start_page ? (
+                  <WikiRace
+                    startPage={(roomState?.game_data as any)?.start_page as string}
+                    targetPage={(roomState?.game_data as any)?.target_page as string}
+                    onWin={async (history) => {
+                      await submitWikiRaceWinRemote(roomCode, myPlayerId, roomState?.game_data, history);
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-[50vh] flex-col items-center justify-center gap-4">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+                    <p className="text-sm font-bold text-slate-400">Génération du parcours...</p>
+                  </div>
+                )
               ) : (
                 <QuizGame
                   roomCode={roomCode}
